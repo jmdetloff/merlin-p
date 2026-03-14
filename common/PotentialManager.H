@@ -27,12 +27,12 @@ class PotentialManager
 
 		Error::ErrorCode populatePotentialsSlimFactors(map<int,SlimFactor*>&,VSET&);
 
-		int populatePotential(Potential*,bool random);
+		int populatePotential(Potential*);
 
 	private:
 		int readAllMeanCov(const char*, const char*);
-		int estimateAllMeanCov(bool,INTDBLMAP&,map<int,INTDBLMAP*>&,INTINTMAP&);
-		int estimateCovariance(bool,INTDBLMAP*,int,int);
+		int estimateAllMeanCov(INTDBLMAP&,map<int,INTDBLMAP*>&,INTINTMAP&);
+		int estimateCovariance(INTDBLMAP*,int,int);
 
 		EvidenceManager* evMgr;
 		INTDBLMAP globalMean;

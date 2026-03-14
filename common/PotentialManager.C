@@ -66,7 +66,7 @@ PotentialManager::init(int f)
 	else
 	{
 		INTINTMAP& trainEvidSet=evMgr->getTrainingSet();
-		estimateAllMeanCov(randomData,globalMean,globalCovar,trainEvidSet);
+		estimateAllMeanCov(globalMean,globalCovar,trainEvidSet);
 	}
 	ludecomp=gsl_matrix_alloc(MAXFACTORSIZE_ALLOC,MAXFACTORSIZE_ALLOC);
 	perm=gsl_permutation_alloc(MAXFACTORSIZE_ALLOC);
@@ -97,7 +97,7 @@ PotentialManager::reset()
 }
 
 int
-PotentialManager::estimateAllMeanCov(bool random, INTDBLMAP& gMean, map<int,INTDBLMAP*>& gCovar,INTINTMAP& trainEvidSet)
+PotentialManager::estimateAllMeanCov(INTDBLMAP& gMean, map<int,INTDBLMAP*>& gCovar,INTINTMAP& trainEvidSet)
 {
 	int evidCnt=trainEvidSet.size();
 	//First get the mean and then the variance
@@ -105,7 +105,7 @@ PotentialManager::estimateAllMeanCov(bool random, INTDBLMAP& gMean, map<int,INTD
 	for(INTINTMAP_ITER eIter=trainEvidSet.begin();eIter!=trainEvidSet.end();eIter++)
 	{
 		EMAP* evidMap=NULL;
-		if(random)
+		if(randomData)
 		{
 			evidMap=evMgr->getRandomEvidenceAt(eIter->first);
 		}
@@ -142,7 +142,7 @@ PotentialManager::estimateAllMeanCov(bool random, INTDBLMAP& gMean, map<int,INTD
 	for(INTINTMAP_ITER eIter=trainEvidSet.begin();eIter!=trainEvidSet.end();eIter++)
 	{
 		EMAP* evidMap=NULL;
-		if(random)
+		if(randomData)
 		{
 			evidMap=evMgr->getRandomEvidenceAt(eIter->first);
 		}
@@ -227,7 +227,7 @@ PotentialManager::estimateAllMeanCov(bool random, INTDBLMAP& gMean, map<int,INTD
 }
 
 int
-PotentialManager::estimateCovariance(bool random,INTDBLMAP* vcov, int uId, int vId)
+PotentialManager::estimateCovariance(INTDBLMAP* vcov, int uId, int vId)
 {
 	INTINTMAP& trainEvidSet=evMgr->getTrainingSet();
 	int evidCnt=trainEvidSet.size();
@@ -235,7 +235,7 @@ PotentialManager::estimateCovariance(bool random,INTDBLMAP* vcov, int uId, int v
 	for(INTINTMAP_ITER eIter=trainEvidSet.begin();eIter!=trainEvidSet.end();eIter++)
 	{
 		EMAP* evidMap=NULL;
-		if(random)
+		if(randomData)
 		{
 			evidMap=evMgr->getRandomEvidenceAt(eIter->first);
 		}
@@ -407,7 +407,7 @@ PotentialManager::populatePotentialsSlimFactors(map<int,SlimFactor*>& factorSet,
 			}
 		}
 		aPotFunc->potZeroInit();
-		populatePotential(aPotFunc,false);
+		populatePotential(aPotFunc);
 		aPotFunc->calculateJointEntropy();
 		sFactor->jointEntropy=aPotFunc->getJointEntropy();
 		if(sFactor->jointEntropy<0)
@@ -427,7 +427,7 @@ PotentialManager::populatePotentialsSlimFactors(map<int,SlimFactor*>& factorSet,
 }
 
 int
-PotentialManager::populatePotential(Potential* aPot, bool random)
+PotentialManager::populatePotential(Potential* aPot)
 {
 	VSET& potVars=aPot->getAssocVariables();
 	for(VSET_ITER vIter=potVars.begin();vIter!=potVars.end(); vIter++)
@@ -446,7 +446,7 @@ PotentialManager::populatePotential(Potential* aPot, bool random)
 		{
 			if(covar->find(uIter->first)==covar->end())
 			{
-				estimateCovariance(random,covar,uIter->first,vIter->first);
+				estimateCovariance(covar,uIter->first,vIter->first);
 			}
 			double cval=(*covar)[uIter->first];
 			aPot->updateCovariance(vIter->first,uIter->first,cval);

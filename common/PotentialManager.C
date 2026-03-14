@@ -13,6 +13,9 @@
 
 PotentialManager::PotentialManager()
 {
+	data=NULL;
+	meanMat=NULL;
+	covMat=NULL;
 	ludecomp=NULL;
 	perm=NULL;
 	randomData=false;
@@ -28,19 +31,24 @@ PotentialManager::~PotentialManager()
 	{
 		gsl_permutation_free(perm);
 	}
+	if(data!=NULL)
+	{
+		delete data;
+	}
+	if(meanMat!=NULL)
+	{
+		delete meanMat;
+	}
+	if(covMat!=NULL)
+	{
+		delete covMat;
+	}
 }
 
 int 
 PotentialManager::setEvidenceManager(EvidenceManager* aPtr)
 {
 	evMgr=aPtr;
-	return 0;
-}
-
-int
-PotentialManager::setOutputDir(const char* aDirName)
-{
-	strcpy(outputDir,aDirName);
 	return 0;
 }
 
@@ -52,22 +60,9 @@ PotentialManager::setRandom(bool flag)
 }
 
 int
-PotentialManager::init(int f)
+PotentialManager::init()
 {
-	char mFName[1024];
-	char sdFName[1024];
-	sprintf(mFName,"%s/gauss_mean_%d.txt",outputDir,f);
-	sprintf(sdFName,"%s/gauss_std_%d.txt",outputDir,f);
-	ifstream inFile(mFName);
-	if(inFile.good())
-	{
-		readAllMeanCov(mFName,sdFName);
-	}
-	else
-	{
-		INTINTMAP& trainEvidSet=evMgr->getTrainingSet();
-		estimateAllMeanCov(globalMean,globalCovar,trainEvidSet);
-	}
+	initData();
 	ludecomp=gsl_matrix_alloc(MAXFACTORSIZE_ALLOC,MAXFACTORSIZE_ALLOC);
 	perm=gsl_permutation_alloc(MAXFACTORSIZE_ALLOC);
 	return 0;
@@ -76,13 +71,6 @@ PotentialManager::init(int f)
 int
 PotentialManager::reset()
 {
-	globalMean.clear();
-	for(map<int,INTDBLMAP*>::iterator cIter=globalCovar.begin();cIter!=globalCovar.end();cIter++)
-	{
-		cIter->second->clear();
-		delete cIter->second;
-	}
-	globalCovar.clear();
 	if(ludecomp!=NULL)
 	{
 		gsl_matrix_free(ludecomp);
@@ -93,15 +81,42 @@ PotentialManager::reset()
 		gsl_permutation_free(perm);
 		perm=NULL;
 	}
+	if(data!=NULL)
+	{
+		delete data;
+		data=NULL;
+	}
+	if(meanMat!=NULL)
+	{
+		delete meanMat;
+		meanMat=NULL;
+	}
+	if(covMat!=NULL)
+	{
+		delete covMat;
+		covMat=NULL;
+	}
 	return 0;
 }
 
 int
-PotentialManager::estimateAllMeanCov(INTDBLMAP& gMean, map<int,INTDBLMAP*>& gCovar,INTINTMAP& trainEvidSet)
+PotentialManager::initData()
 {
-	int evidCnt=trainEvidSet.size();
-	//First get the mean and then the variance
-	int dId=0;
+	INTINTMAP& trainEvidSet=evMgr->getTrainingSet();
+	EMAP* evidMap=evMgr->getEvidenceAt(trainEvidSet.begin()->first);
+	int varCnt=evidMap->size();
+
+	// data is the data matrix which will have the variable by sample information
+	if(data==NULL)
+	{
+		data=new Matrix(varCnt,trainEvidSet.size());
+		meanMat=new Matrix(varCnt,1);
+		meanMat->setAllValues(0);
+		covMat=new Matrix(varCnt,varCnt);
+		covMat->setAllValues(-1);
+	}
+
+	// Copy all the samples into the data matrix
 	for(INTINTMAP_ITER eIter=trainEvidSet.begin();eIter!=trainEvidSet.end();eIter++)
 	{
 		EMAP* evidMap=NULL;
@@ -118,254 +133,44 @@ PotentialManager::estimateAllMeanCov(INTDBLMAP& gMean, map<int,INTDBLMAP*>& gCov
 			int vId=vIter->first;
 			Evidence* evid=vIter->second;
 			double val=evid->getEvidVal();
-			if(gMean.find(vId)==gMean.end())
-			{
-				gMean[vId]=val;
-			}
-			else
-			{
-				gMean[vId]=gMean[vId]+val;
-			}
+			data->setValue(val,vId,eIter->first);
 		}
-		dId++;	
 	}
-	//Now estimate the mean
-	for(INTDBLMAP_ITER idIter=gMean.begin();idIter!=gMean.end();idIter++)
-	{
-		idIter->second=idIter->second/(double) evidCnt;
-		INTDBLMAP* vcov=new INTDBLMAP;
-		gCovar[idIter->first]=vcov;
-	}
-	return 0;
-	int covPair=0;
-	//Now the variance
-	for(INTINTMAP_ITER eIter=trainEvidSet.begin();eIter!=trainEvidSet.end();eIter++)
-	{
-		EMAP* evidMap=NULL;
-		if(randomData)
-		{
-			evidMap=evMgr->getRandomEvidenceAt(eIter->first);
-		}
-		else
-		{
-			evidMap=evMgr->getEvidenceAt(eIter->first);
-		}
-		for(EMAP_ITER vIter=evidMap->begin();vIter!=evidMap->end(); vIter++)
-		{
-			int vId=vIter->first;
-			Evidence* evid=vIter->second;
-			double vval=evid->getEvidVal();
-			double vmean=gMean[vId];
-			INTDBLMAP* vcov=NULL;
-			if(gCovar.find(vId)==gCovar.end())
-			{
-				vcov=new INTDBLMAP;
-				gCovar[vId]=vcov;
-			}
-			else
-			{
-				vcov=gCovar[vId];
-			}
-			for(EMAP_ITER uIter=vIter;uIter!=evidMap->end();uIter++)
-			{
-				int uId=uIter->first;
-				Evidence* evid1=uIter->second;
-				double uval=evid1->getEvidVal();
-				double umean=gMean[uId];
-				double diffprod=(vval-vmean)*(uval-umean);
-				INTDBLMAP* ucov=NULL;
-				if(gCovar.find(uId)==gCovar.end())
-				{
-					ucov=new INTDBLMAP;
-					gCovar[uId]=ucov;
-				}
-				else
-				{
-					ucov=gCovar[uId];
-				}
-				if(vcov->find(uId)==vcov->end())
-				{
-					covPair++;
-					(*vcov)[uId]=diffprod;
-				}
-				else
-				{
-					(*vcov)[uId]=(*vcov)[uId]+diffprod;
-				}
-				if(uId!=vId)
-				{
-					if(ucov->find(vId)==ucov->end())
-					{
-						(*ucov)[vId]=diffprod;
-					}
-					else
-					{
-						(*ucov)[vId]=(*ucov)[vId]+diffprod;
-					}
-				}
-			}
-		}
 
-	}
-	//Now estimate the variance
-	for(map<int,INTDBLMAP*>::iterator idIter=gCovar.begin();idIter!=gCovar.end();idIter++)
+	// Done copying. Now we can go over the rows of data and get the means
+	for(int i=0;i<varCnt;i++)
 	{
-		INTDBLMAP* var=idIter->second;
-		for(INTDBLMAP_ITER vIter=var->begin();vIter!=var->end();vIter++)
+		double sampleSum=0;
+		for(int j=0;j<data->getColCnt();j++)
 		{
-			if(vIter->first==idIter->first)
-			{
-				vIter->second=(0.001+vIter->second)/((double)(evidCnt-1));
-			}
-			else
-			{
-				vIter->second=vIter->second/((double)(evidCnt-1));
-			}
+			sampleSum += data->getValue(i,j);
 		}
+		double sampleSize=(double) data->getColCnt();
+		meanMat->setValue(sampleSum/sampleSize,i,0);
 	}
+
 	return 0;
 }
 
 int
-PotentialManager::estimateCovariance(INTDBLMAP* vcov, int uId, int vId)
+PotentialManager::estimateCovariance(int uId, int vId)
 {
-	INTINTMAP& trainEvidSet=evMgr->getTrainingSet();
-	int evidCnt=trainEvidSet.size();
-	INTDBLMAP* ucov=globalCovar[uId];
-	for(INTINTMAP_ITER eIter=trainEvidSet.begin();eIter!=trainEvidSet.end();eIter++)
+	double ssd=0;
+	for(int i=0;i<data->getColCnt();i++) 
 	{
-		EMAP* evidMap=NULL;
-		if(randomData)
-		{
-			evidMap=evMgr->getRandomEvidenceAt(eIter->first);
-		}
-		else
-		{
-			evidMap=evMgr->getEvidenceAt(eIter->first);
-		}
-		Evidence* evid=(*evidMap)[vId];
-		double vval=evid->getEvidVal();
-		double vmean=globalMean[vId];
-		Evidence* evid1=(*evidMap)[uId];
-		double uval=evid1->getEvidVal();
-		double umean=globalMean[uId];
-		double diffprod=(vval-vmean)*(uval-umean);
-		if(vcov->find(uId)==vcov->end())
-		{
-			(*vcov)[uId]=diffprod;
-		}
-		else
-		{
-			(*vcov)[uId]=(*vcov)[uId]+diffprod;
-		}
-		if(uId!=vId)
-		{
-			if(ucov->find(vId)==ucov->end())
-			{
-				(*ucov)[vId]=diffprod;
-			}
-			else
-			{
-				(*ucov)[vId]=(*ucov)[vId]+diffprod;
-			}
-		}
+		double vval=data->getValue(vId,i);
+		double vmean=meanMat->getValue(vId,0);
+		double uval=data->getValue(uId,i);
+		double umean=meanMat->getValue(uId,0);
+		ssd += (vval-vmean)*(uval-umean);
 	}
-	//Now estimate the variance
 	if(uId==vId)
 	{
-		double ssd=(*ucov)[uId];
-		(*ucov)[uId]=(0.001+ssd)/((double)(evidCnt-1));
+		ssd += 0.001;
 	}
-	else
-	{
-		double ssduv=(*ucov)[vId];
-		(*ucov)[vId]=ssduv/((double)(evidCnt-1));
-		(*vcov)[uId]=ssduv/((double)(evidCnt-1));
-	}
-	return 0;
-}
-
-int
-PotentialManager::readAllMeanCov(const char* mFName, const char* sdFName)
-{
-	ifstream mFile(mFName);
-	ifstream sdFile(sdFName);
-	char buffer[1024];
-	while(mFile.good())
-	{
-		mFile.getline(buffer,1023);
-		if(strlen(buffer)<=0)
-		{
-			continue;
-		}
-		char* tok=strtok(buffer,"\t");
-		int tokCnt=0;
-		int vId;
-		double mean=0;
-		while(tok!=NULL)
-		{	
-			if(tokCnt==0)
-			{
-				vId=atoi(tok);	
-			}
-			else if(tokCnt==1)
-			{
-				mean=atof(tok);
-			}
-			tok=strtok(NULL,"\t");
-			tokCnt++;
-		}
-		globalMean[vId]=mean;
-	}
-	mFile.close();
-	int lineNo=0;
-	while(sdFile.good())
-	{
-		sdFile.getline(buffer,1023);
-		if(strlen(buffer)<=0)
-		{
-			continue;
-		}
-		char* tok=strtok(buffer,"\t");
-		int tokCnt=0;
-		int vId=0;
-		int uId=0;
-		double covariance=0;
-		while(tok!=NULL)
-		{
-			if(tokCnt==0)
-			{
-				uId=atoi(tok);
-			}
-			else if(tokCnt==1)
-			{
-				vId=atoi(tok);
-			}
-			else if(tokCnt==2)
-			{
-				covariance=atof(tok);
-			}
-			tok=strtok(NULL,"\t");
-			tokCnt++;
-		}
-		INTDBLMAP* ucov=NULL;
-		if(globalCovar.find(uId)==globalCovar.end())
-		{
-			ucov=new INTDBLMAP;
-			globalCovar[uId]=ucov;
-		}
-		else
-		{
-			ucov=globalCovar[uId];
-		}
-		(*ucov)[vId]=covariance;
-		if(uId==0 && vId==0)
-		{
-			cout << "Found uId=0 vId=0 covar="<< covariance << " at lineno " << lineNo  << endl;
-		}
-		lineNo++;
-	}
-	sdFile.close();
+	double var = ssd/((double)(data->getColCnt()-1));
+	covMat->setValue(var,uId,vId);
+	covMat->setValue(var,vId,uId);
 	return 0;
 }
 
@@ -432,28 +237,21 @@ PotentialManager::populatePotential(Potential* aPot)
 	VSET& potVars=aPot->getAssocVariables();
 	for(VSET_ITER vIter=potVars.begin();vIter!=potVars.end(); vIter++)
 	{
-		if(globalMean.find(vIter->first)==globalMean.end())
-		{
-			cerr <<"No var with id " << vIter->first << endl;
-			exit(-1);
-		}
-
-		double mean=globalMean[vIter->first];
-		INTDBLMAP* covar=globalCovar[vIter->first];
+		double mean=meanMat->getValue(vIter->first,0);
 		aPot->updateMean(vIter->first,mean);
-		
+
 		for(VSET_ITER uIter=vIter;uIter!=potVars.end();uIter++)
 		{
-			if(covar->find(uIter->first)==covar->end())
+			double cval=covMat->getValue(vIter->first,uIter->first);
+			if(cval==-1)
 			{
-				estimateCovariance(covar,uIter->first,vIter->first);
+				estimateCovariance(uIter->first,vIter->first);
+				cval=covMat->getValue(vIter->first,uIter->first);
 			}
-			double cval=(*covar)[uIter->first];
 			aPot->updateCovariance(vIter->first,uIter->first,cval);
 			aPot->updateCovariance(uIter->first,vIter->first,cval);
 		}
 	}
-
 	aPot->makeValidJPD(ludecomp,perm);
 	return 0;
 }

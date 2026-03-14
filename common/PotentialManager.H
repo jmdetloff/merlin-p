@@ -12,6 +12,7 @@ using namespace std;
 class Potential;
 class EvidenceManager;
 class SlimFactor;
+class Matrix;
 
 class PotentialManager
 {
@@ -19,9 +20,8 @@ class PotentialManager
 		PotentialManager();
 		~PotentialManager();
 
-		int init(int);
+		int init();
 		int setEvidenceManager(EvidenceManager*);
-		int setOutputDir(const char*);
 		int setRandom(bool);
 		int reset();
 
@@ -30,16 +30,15 @@ class PotentialManager
 		int populatePotential(Potential*);
 
 	private:
-		int readAllMeanCov(const char*, const char*);
-		int estimateAllMeanCov(INTDBLMAP&,map<int,INTDBLMAP*>&,INTINTMAP&);
-		int estimateCovariance(INTDBLMAP*,int,int);
+		int initData();
+		int estimateCovariance(int,int);
 
 		EvidenceManager* evMgr;
-		INTDBLMAP globalMean;
-		map<int,INTDBLMAP*> globalCovar;
-		char outputDir[1024];
 		gsl_matrix* ludecomp;
 		gsl_permutation* perm;
 		bool randomData;
+		Matrix* data;
+		Matrix* meanMat;
+		Matrix* covMat;
 };
 #endif

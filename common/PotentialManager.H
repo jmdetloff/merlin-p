@@ -71,8 +71,6 @@ class PotentialManager
 		int estimatePotCondVarBias(Potential* apot,int vId, int cid,double b, map<int,EvidenceManager*>& evSet,map<int,map<int,INTDBLMAP*>*>& gammas);
 		int estimatePotCondBiasThenVar(Potential* apot,int vId, int cid,double b, map<int,EvidenceManager*>& evSet,map<int,map<int,map<int,INTDBLMAP*>*>*>& gammas);
 
-
-		double getPseudoLikelihood(SlimFactor*,VSET&,bool);
 		double getGaussianLikelihood(map<int,SlimFactor*>&,VSET&,bool);
 
 		double getLikelihood(SlimFactor*,VSET&);

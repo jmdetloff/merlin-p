@@ -2998,67 +2998,6 @@ PotentialManager::estimatePotCondBiasThenVar(Potential* apot,int vId, int cid,do
 	return 0;
 }
 
-
-double
-PotentialManager::getPseudoLikelihood(SlimFactor* sFactor,VSET& varSet, bool train)
-{
-	Potential* aPotFunc=new Potential;
-	Variable* aVar=varSet[sFactor->fId];
-	aPotFunc->setAssocVariable(aVar,Potential::FACTOR);
-	for(INTINTMAP_ITER aIter=sFactor->mergedMB.begin();aIter!=sFactor->mergedMB.end();aIter++)
-	{
-		Variable* aVar=varSet[aIter->first];
-		aPotFunc->setAssocVariable(aVar,Potential::MARKOV_BNKT);
-	}
-	aPotFunc->potZeroInit();
-	populatePotential(aPotFunc,false);
-	//This function creates a submatrix of the covariance matrix and inverts it
-	aPotFunc->initMBCovMean();
-	INTINTMAP* dataSet=NULL;
-	if(train)
-	{
-		dataSet=&(evMgr->getTrainingSet());
-	}
-	else
-	{
-		dataSet=&(evMgr->getTestSet());
-	}
-	INTDBLMAP subData;
-	double pll=0;
-	int thresholded=0;
-	for(INTINTMAP_ITER dIter=dataSet->begin();dIter!=dataSet->end();dIter++)
-	{
-		EMAP* evidMap=NULL;
-		evidMap=evMgr->getEvidenceAt(dIter->first);
-		Evidence* evid=(*evidMap)[sFactor->fId];
-		double val=evid->getEvidVal();
-		subData[sFactor->fId]=val;
-		for(INTINTMAP_ITER vIter=sFactor->mergedMB.begin();vIter!=sFactor->mergedMB.end(); vIter++)
-		{
-			int vId=vIter->first;
-			Evidence* evid=(*evidMap)[vIter->first];
-			double val=evid->getEvidVal();
-			subData[vId]=val;
-		}
-		double cll=aPotFunc->getCondPotValueFor(subData);
-
-		if(cll<1e-50)
-		{
-			cll=1e-50;
-			thresholded++;
-		}
-		pll=pll+log(cll);
-	}
-	subData.clear();
-	if(thresholded>0)
-	{
-	//	cout <<"Thresholded " << thresholded << " datapoints to 1e-50" << endl;
-	}
-	delete aPotFunc;
-	return pll;
-}
-
-
 double 
 PotentialManager::getGaussianLikelihood(map<int,SlimFactor*>& factorSet,VSET& varSet, bool train)
 {

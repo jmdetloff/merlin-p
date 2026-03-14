@@ -587,24 +587,16 @@ MetaLearner::doCrossValidation(int foldCnt)
 			fgMgr->setOutputDir(outLocMap[eIter->first].c_str());
 			fgMgr->setMaxFactorSize(maxFactorSize);
 			fgMgr->setMaxFactorSize_Approx(maxFactorSizeApprox);
-			fgMgr->setPenalty(penalty);
 			fgMgrSet[eIter->first]=fgMgr;
 			if(strlen(restrictedFName)>0)
 			{
 				fgMgr->readRestrictedVarlist(restrictedFName);
 			}
 			fgMgr->allocateFactorSpace();
-
-			if(fgMgr->readRandomInfo()==-1)
-			{
-				cout <<"Did not find random mutual informations. Calling estimateRandomInfo " << endl;
-				fgMgr->estimateRandomInfo_Approximate(SAMPLE_CNT);
-				fgMgr->readRandomInfo();
-			}
 			if(fgMgr->readStructure(f)==-1)
 			{
 				fgMgr->learnStructure();
-				fgMgr->showStructure_allK(f);
+				fgMgr->showStructure(f);
 			}
 			char outputDir[1024];
 			sprintf(outputDir,"%s/fold%d",outLocMap[eIter->first].c_str(),f);

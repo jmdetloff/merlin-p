@@ -2468,95 +2468,6 @@ MetaLearner::checkMBSize(int cid, int u,int v, int currK)
 }
 
 int
-MetaLearner::populateGraphsFromFile()
-{
-	ifstream inFile(trueGraphFName);
-	char buffer[1024];
-	VSET& varSet=varManager->getVariableSet();
-	while(inFile.good())
-	{	
-		inFile.getline(buffer,1023);
-		if(strlen(buffer)<=0)
-		{
-			continue;
-		}
-		char* tok=strtok(buffer,"\t");
-		int tokCnt=0;
-		Variable* u=NULL;
-		Variable* v=NULL;
-		INTINTMAP condSet;
-		for(map<int,EvidenceManager*>::iterator eIter=evMgrSet.begin();eIter!=evMgrSet.end();eIter++)
-		{
-			condSet[eIter->first]=0;
-		}
-		while(tok!=NULL)
-		{
-			if(tokCnt==0)
-			{
-				int vid=varManager->getVarID(tok);
-				u=varSet[vid];
-			}
-			else if(tokCnt==1)
-			{
-				int vid=varManager->getVarID(tok);
-				v=varSet[vid];
-			}
-			else
-			{
-				int cid=atoi(tok);
-				condSet[cid]=1;
-			}
-			tok=strtok(NULL,"\t");
-			tokCnt++;
-		}
-
-		/*string condKey;
-		genCondSetKey(condSet,condKey);
-		if(pooledData.find(condKey)==pooledData.end())
-		{
-			genPooledDataset(condSet,condKey);
-		}
-		PotentialManager* potMgr=pooledPotentials[condKey];
-		int csetid=condsetKeyIDMap[condKey];*/
-		for(INTINTMAP_ITER cIter=condSet.begin();cIter!=condSet.end();cIter++)
-		{
-			if(cIter->second==0)
-			{
-				continue;
-			}
-			FactorGraph* fg=fgGraphSet[cIter->first];
-			SlimFactor* sFactor=fg->getFactorAt(u->getID());
-			SlimFactor* dFactor=fg->getFactorAt(v->getID());
-			sFactor->mergedMB[dFactor->fId]=0;
-			dFactor->mergedMB[sFactor->fId]=0;
-		}
-	}
-	//Populate all the potentials of all the graphs
-	for(map<int,FactorGraph*>::iterator fIter=fgGraphSet.begin();fIter!=fgGraphSet.end();fIter++)
-	{
-		FactorGraph* condspecGraph=fIter->second;
-		map<int,SlimFactor*>& factorSet=condspecGraph->getAllFactors();
-		string& condKey=condsetIDKeyMap[fIter->first];
-		PotentialManager* potMgr=potMgrSet[fIter->first];
-		for(map<int,SlimFactor*>::iterator sIter=factorSet.begin();sIter!=factorSet.end();sIter++)
-		{
-			SlimFactor* sFactor=sIter->second;
-			sFactor->potFunc=new Potential;
-			sFactor->potFunc->setAssocVariable(varSet[sFactor->fId],Potential::FACTOR);
-			for(INTINTMAP_ITER mIter=sFactor->mergedMB.begin();mIter!=sFactor->mergedMB.end();mIter++)
-			{
-				sFactor->potFunc->setAssocVariable(varSet[mIter->first],Potential::MARKOV_BNKT);
-			}
-			sFactor->potFunc->potZeroInit();
-			potMgr->populatePotential(sFactor->potFunc,random);
-			sFactor->potFunc->initMBCovMean();
-		}
-	}
-	inFile.close();
-	return 0;
-}
-
-int
 MetaLearner::normalizeWeight(INTDBLMAP& wtVect)
 {
 	double maxExp=-1000000000;
@@ -2591,42 +2502,6 @@ MetaLearner::normalizeWeight(INTDBLMAP& wtVect)
 		double scWt=tempval/newtotal;
 		dIter->second=scWt;
 	}
-	return 0;
-}
-
-
-int
-MetaLearner::updatePotentials()
-{
-	VSET& varSet=varManager->getVariableSet();
-	/*for(map<int,FactorGraph*>::iterator gIter=fgGraphSet.begin();gIter!=fgGraphSet.end();gIter++)
-	{
-		FactorGraph* graph=gIter->second;
-		map<int,SlimFactor*>& factorSet=graph->getAllFactors();
-		string& condKey=condsetIDKeyMap[gIter->first];
-		PotentialManager* potMgr=pooledPotentials[condKey];
-		for(map<int,SlimFactor*>::iterator fIter=factorSet.begin();fIter!=factorSet.end();fIter++)
-		{
-			SlimFactor* sFactor=fIter->second;
-			potMgr->populatePotential(sFactor->potFunc,false);
-			sFactor->potFunc->initMBCovMean();
-			if(sFactor->potFunc->getCondVariance()<=0)
-			{
-				cout <<"Found negative covariance for "<< sFactor->fId << " "  << varSet[sFactor->fId]->getName() <<  " in condition " << gIter->first  << endl;
-				sFactor->potFunc->setCondVariance(1e-20);
-			}
-		}
-	}*/
-
-	//Now reestimate the plls for each dataset and potential
-	INTDBLMAP* plls=currPLLMap[evMgrSet.begin()->first];
-	for(VSET_ITER vIter=varSet.begin();vIter!=varSet.end();vIter++)
-	{
-		Variable* var=vIter->second;
-		double newPLL_s=getNewPLLScore_Condition(-1,vIter->first,NULL);
-		(*plls)[vIter->first]=newPLL_s;
-	}
-
 	return 0;
 }
 

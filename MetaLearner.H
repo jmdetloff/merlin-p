@@ -103,11 +103,8 @@ class MetaLearner
 	int getEdgeVars(string&, char*, char*);
 	bool checkMBSize(INTINTMAP*,int,int,int);
 	bool checkMBSize(int,int,int,int);
-	int populateGraphsFromFile();
 	
 	int normalizeWeight(INTDBLMAP&);
-	//Update the potentials to reflect the new covariance and mean estimates and also recompute the likelihood.
-	int updatePotentials();
 
 	int setPriorGraph(const char* aFName, map<string,map<string,double>*>& priorGraph);
 	int redefineModules();

@@ -46,13 +46,9 @@ class PotentialManager
 		int initValidationSet(int,int);
 		int reset();
 		int resetCache();
-		int initRandom();
 		
 		Error::ErrorCode populatePotentialsSlimFactors(map<int,SlimFactor*>&,VSET&);
-		Error::ErrorCode estimateRandomInfo(map<int,SlimFactor*>&,VSET&,vector<double>&,int fSize);
-		int estimateMarginalEntropies(map<int,SlimFactor*>&,VSET&,bool);
-		int populateFactor(map<int,SlimFactor*>&,VSET&,SlimFactor*,bool random);
-		int populateFactor_Buffer(map<int,SlimFactor*>&,VSET&,SlimFactor*,bool random);
+
 		//We are going to store the set of potentials per factor. That is each 
 		//POTVECT object stores the set of potentials for a particular factor
 		int populatePotential(Potential*,bool random);
@@ -76,14 +72,12 @@ class PotentialManager
 		double getLikelihood(SlimFactor*,VSET&);
 		double getLikelihood(SlimFactor*,VSET&,map<int,int>&);
 		int estimateConditionalPotential(SlimFactor*,VSET&,Potential**,STRDBLMAP&);
-		int populatePotential(Potential*,STRDBLMAP&);
 		int estimateCanonicalPotential(SlimFactor*, VSET&,INTINTMAP&,INTINTMAP&,map<int,SlimFactor*>&);
 		int estimateCanonicalPotential_Abbeel(SlimFactor*, VSET&,INTINTMAP&,INTINTMAP&,map<int,SlimFactor*>&);
 		int estimateCanonicalPotential_Approximate(SlimFactor*, VSET&,INTINTMAP&,INTINTMAP&,map<int,SlimFactor*>&);
 		int resetPotFuncs();
 		int estimateCanonicalPotential_Joint(SlimFactor*, VSET&,INTINTMAP&,INTINTMAP&,map<int,SlimFactor*>&);
 		Potential* getPotential(int);
-		double getConditionalEntropy(int,INTINTMAP&,VSET&);
 
 		double getSampleLikelihood(map<int,SlimFactor*>&, VSET&, INTINTMAP*);
 		int getVariableSample(INTINTMAP&,VSET&,int,SlimFactor*,gsl_rng*);

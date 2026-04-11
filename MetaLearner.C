@@ -1596,29 +1596,28 @@ MetaLearner::initCorrelation()
 
 	double threshold = sampleCount / 2.0;
 
-	for (int i = 0; i < varSet.size(); i++)
+	for (int i = 0; i < varCount; i++)
 	{
 		double xx = ssd[i];
+		double* dev_i = deviations[i].data();
 
-		for (int j = i; j < varSet.size(); j++)
+		for (int j = i; j < varCount; j++)
 		{
-			double yy = ssd[j];
+			double* dev_j = deviations[j].data();
 			double xy = 0;
-			double oppRel = 0;
+			int oppRel = 0;
 
 			for(int k = 0; k < sampleCount; k++)
 			{
-				double diff1 = deviations[i][k];
-				double diff2 = deviations[j][k];
+				double diff1 = dev_i[k];
+				double diff2 = dev_j[k];
 				double val = diff1 * diff2;
 				xy += val;
-				if(val < 0)
-				{
-					oppRel++;
-				}
+				oppRel += (val < 0);
 			}
 
-			double cc = sqrt((xy * xy) / (xx * yy));
+			double yy = ssd[j];
+			double cc = abs(xy) / sqrt(xx * yy);
 
 			if(oppRel > threshold)
 			{

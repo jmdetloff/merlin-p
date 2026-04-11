@@ -5,6 +5,7 @@
 #include <sys/timeb.h>
 #include <sys/time.h>
 #include <time.h>
+#include <chrono>
 
 #include "Error.H"
 #include "Variable.H"
@@ -37,6 +38,7 @@ MetaLearner::MetaLearner()
 	convThreshold=1e-3;
 	factorGraph=nullptr;
 	currPLL=nullptr;
+	correlation=nullptr;
 }
 
 MetaLearner::~MetaLearner()
@@ -470,7 +472,14 @@ MetaLearner::doCrossValidation(int foldCnt)
 		sprintf(foldOutputDirCmd,"mkdir %s",outputDir);
 		system(foldOutputDirCmd);
 
+		auto startTime = std::chrono::high_resolution_clock::now();
+
 		start(f);
+
+		auto end = std::chrono::high_resolution_clock::now();
+		std::chrono::duration<double> elapsed = end - startTime;
+		std::cout << "** Total time: " << elapsed.count() << " seconds\n";
+
 		getPredictionError_CrossValid(f);
 		clearFoldSpecData();
 	}
@@ -552,6 +561,9 @@ MetaLearner::start(int f)
 						continue;
 					}
 				}
+
+				auto start = std::chrono::high_resolution_clock::now();
+
 				collectMoves(currK,vID);
 				if(moveSet.size()==0)
 				{
@@ -564,6 +576,10 @@ MetaLearner::start(int f)
 				subiter++;
 				showid++;
 				attemptedMoves++;
+
+				auto end = std::chrono::high_resolution_clock::now();
+				std::chrono::duration<double> elapsed = end - start;
+				std::cout << "** Elapsed time: " << elapsed.count() << " seconds\n";
 			}
 			if((currGlobalScore-scorePremodule)<=convThreshold)
 			{
@@ -581,6 +597,7 @@ MetaLearner::start(int f)
 	}
 	cout <<"Final Score " << currGlobalScore << endl;
 	finalScores[f]=currGlobalScore;
+
 	return 0;
 }
 
@@ -844,8 +861,8 @@ MetaLearner::getPredictionError_CrossValid(int foldid)
 		double coeff_det=1-(error/totalvar);
 		error=error/norm;
 		error=sqrt(error);
-		double nmsd=error/(maxval-minval);
-		double cc=d.computeCC(truevect,predvect);
+		// double nmsd=error/(maxval-minval);
+		// double cc=d.computeCC(truevect,predvect);
 		//pFile<< "\t"<<error <<"\t" << nmsd << "\t" << coeff_det <<"\t" << cc <<endl;
 	}
 	//oFile.close();
@@ -1397,6 +1414,15 @@ MetaLearner::redefineModules()
 {
 	INTINTMAP& tSet=evidenceManager->getTrainingSet();
 
+	if (correlation==nullptr)
+	{
+		auto start = std::chrono::high_resolution_clock::now();
+		initCorrelation();
+		auto end = std::chrono::high_resolution_clock::now();
+		std::chrono::duration<double> elapsed = end - start;
+		std::cout << "** Initializing correlations: " << elapsed.count() << " seconds\n";
+	}
+
 	map<string,int> genesWithNoNeighbors;
 
 	// Create a node for each member of each module
@@ -1426,6 +1452,7 @@ MetaLearner::redefineModules()
 			{
 				node = new HierarchicalClusterNode;
 				node->nodeName.append(mIter->first);
+				node->varID = mID;
 				hc.addNode(node);
 
 				// Add expression data on the new node
@@ -1449,7 +1476,7 @@ MetaLearner::redefineModules()
 
 	// Perform the new clustering
 	map<int,map<string,int>*> newModules;
-	hc.cluster(newModules,clusterThreshold);
+	hc.cluster(newModules, clusterThreshold, correlation);
 
 	// Clear out any data representing the old module assignments
 	moduleGeneSet.clear();
@@ -1522,4 +1549,84 @@ MetaLearner::redefineModules()
 	genesWithNoNeighbors.clear();
 
 	return 0;
+}
+
+void
+MetaLearner::initCorrelation()
+{
+	INTINTMAP& samples = evidenceManager->getTrainingSet();
+	VSET& varSet = varManager->getVariableSet();
+
+	int varCount = varSet.size();
+	int sampleCount = samples.size();
+
+	vector<double> means(varCount, 0);
+
+	for (INTINTMAP_ITER iter = samples.begin(); iter != samples.end(); iter++)
+	{
+		EMAP* evidMap = evidenceManager->getEvidenceAt(iter->first);
+		for (int i = 0; i < varCount; i++)
+		{
+			Evidence* evid=(*evidMap)[i];
+			means[i] += evid->getEvidVal();
+		}
+	}
+
+	for (int i = 0; i < means.size(); i++) {
+		means[i] /= sampleCount;
+	}
+
+	vector<double> ssd(varCount, 0);
+	vector<vector<double>> deviations(varCount, vector<double>(sampleCount, 0));
+
+	int sampleIndex = 0;
+	for (INTINTMAP_ITER iter = samples.begin(); iter != samples.end(); iter++)
+	{
+		EMAP* evidMap = evidenceManager->getEvidenceAt(iter->first);
+		for (int i = 0; i < varSet.size(); i++)
+		{
+			double deviation = (*evidMap)[i]->getEvidVal() - means[i];
+			deviations[i][sampleIndex] = deviation;
+			ssd[i] += deviation * deviation;
+		}
+		sampleIndex++;
+	}
+
+	correlation = new Matrix(varCount, varCount);
+
+	double threshold = sampleCount / 2.0;
+
+	for (int i = 0; i < varSet.size(); i++)
+	{
+		double xx = ssd[i];
+
+		for (int j = i; j < varSet.size(); j++)
+		{
+			double yy = ssd[j];
+			double xy = 0;
+			double oppRel = 0;
+
+			for(int k = 0; k < sampleCount; k++)
+			{
+				double diff1 = deviations[i][k];
+				double diff2 = deviations[j][k];
+				double val = diff1 * diff2;
+				xy += val;
+				if(val < 0)
+				{
+					oppRel++;
+				}
+			}
+
+			double cc = sqrt((xy * xy) / (xx * yy));
+
+			if(oppRel > threshold)
+			{
+				cc *= -1;
+			}
+
+			correlation->setValue(cc, i, j);
+			correlation->setValue(cc, j, i);
+		}
+	}
 }

@@ -9,13 +9,14 @@
 using namespace std;
 
 class HierarchicalClusterNode;
+class Matrix;
 
 class HierarchicalCluster
 {
 	public:
 		HierarchicalClusterNode* getNode(string nodeName);
 		void addNode(HierarchicalClusterNode* node);
-		int cluster(map<int,map<string,int>*>& modules, double threshold);
+		int cluster(map<int,map<string,int>*>& modules, double threshold, Matrix* correlation);
 
 	private:
 		struct Pair
@@ -34,9 +35,9 @@ class HierarchicalCluster
 			}
 		};
 
-		int estimatePairwiseDist(map<int,HierarchicalClusterNode*>& currNodeSet, priority_queue<Pair*, vector<Pair*>, ComparePair>& pairQueue, int treenodecnt);
+		priority_queue<Pair*, vector<Pair*>, ComparePair> estimatePairwiseDist(map<int,HierarchicalClusterNode*>& currNodeSet, int treenodecnt, Matrix* correlation);
 		void addMergeNode(HierarchicalClusterNode* node, map<int,HierarchicalClusterNode*>& currNodeSet, priority_queue<Pair*, vector<Pair*>, ComparePair>& pairQueue);
-		int calculatePercentVarianceExplained(map<int,map<string,int>*>& modules);
+		// int calculatePercentVarianceExplained(map<int,map<string,int>*>& modules);
 
 		static HierarchicalClusterNode* createMergeNode(Pair *pair, map<int,HierarchicalClusterNode*>& currNodeSet, int nextNodeID);
 		static Pair* getNextPair(priority_queue<Pair*, vector<Pair*>, ComparePair>& pairQueue, double threshold);

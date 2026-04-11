@@ -16,6 +16,7 @@ class EvidenceManager;
 class PotentialManager;
 class MetaMove;
 class HierarchicalCluster;
+class Matrix;
 
 class MetaLearner
 {
@@ -72,6 +73,7 @@ class MetaLearner
 	double getModuleContribLogistic(string& tgtName, string& tfName);
 	int initPhysicalDegree();
 	int getEnrichedTFs(map<string,int>& tfSet,map<string,int>* genes,map<string,map<string,double>*>& edgeSet);
+	void initCorrelation();
 
 	FactorGraph* factorGraph;
 	PotentialManager* potManager;
@@ -109,5 +111,7 @@ class MetaLearner
 	char foldoutDirName[1024];
 	int specificFold;
 	HierarchicalCluster hc;
+
+	Matrix* correlation;
 };
 #endif

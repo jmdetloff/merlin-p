@@ -174,6 +174,9 @@ PotentialManager::createPotential(int factorID)
 double
 PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize, Potential** newPot)
 {
+
+	auto scoreStart = std::chrono::high_resolution_clock::now();
+
 	double variance = getCovariance(factorID, factorID);
 	double bias = meanMat->getValue(factorID, 0);
 	INTDBLMAP weights;
@@ -190,6 +193,12 @@ PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize
 	Matrix *parentMarginalVariances = new Matrix(1, parentCount);
 
 	covariances->setValue(variance, 0, 0);
+
+	auto scoreEnd = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> scoreElapsed = scoreEnd - scoreStart;
+	std::cout << "** Time 1: " << scoreElapsed.count() << " seconds\n";
+
+	scoreStart = std::chrono::high_resolution_clock::now();
 
 	for (int i = 0; i < parentCount; i++)
 	{
@@ -208,11 +217,23 @@ PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize
 		}
 	}
 
+	scoreEnd = std::chrono::high_resolution_clock::now();
+	scoreElapsed = scoreEnd - scoreStart;
+	std::cout << "** Time 2: " << scoreElapsed.count() << " seconds\n";
+
+	scoreStart = std::chrono::high_resolution_clock::now();
+
 	// Compute the final values for the variance of the conditional gaussian,
 	// plus the regression parameters for the mean of the conditional guassian.
 
 	Matrix* parentCovInverse = parentCovariances->invMatrix(ludecomp, perm);
 	Matrix* prod = parentMarginalVariances->multiplyMatrix(parentCovInverse);
+
+	scoreEnd = std::chrono::high_resolution_clock::now();
+	scoreElapsed = scoreEnd - scoreStart;
+	std::cout << "** Time 3: " << scoreElapsed.count() << " seconds\n";
+
+	scoreStart = std::chrono::high_resolution_clock::now();
 
 	for (int i = 0; i < parentCount; i++)
 	{
@@ -243,6 +264,12 @@ PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize
 		return -1;
 	}
 
+	scoreEnd = std::chrono::high_resolution_clock::now();
+	scoreElapsed = scoreEnd - scoreStart;
+	std::cout << "** Time 4: " << scoreElapsed.count() << " seconds\n";
+
+	scoreStart = std::chrono::high_resolution_clock::now();
+
 	// Now that the conditional Gaussian params are computed, we can create the potential.
 	*newPot = new Potential(factorID, variance, bias, weights);
 
@@ -253,6 +280,12 @@ PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize
 	double determinant = covariances->detMatrix(ludecomp, perm);
 	double parentDeterminant = parentCovariances->detMatrix(ludecomp, perm);
 
+	scoreEnd = std::chrono::high_resolution_clock::now();
+	scoreElapsed = scoreEnd - scoreStart;
+	std::cout << "** Time 5: " << scoreElapsed.count() << " seconds\n";
+
+	scoreStart = std::chrono::high_resolution_clock::now();
+
 	double jointLL = computeJointLL(covariances, covInverse, determinant, sampleSize);
 	double jointLLParents = computeJointLL(parentCovariances, parentCovInverse, parentDeterminant, sampleSize);
 
@@ -260,6 +293,10 @@ PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize
 	delete covInverse;
 	delete parentCovariances;
 	delete parentCovInverse;
+
+	scoreEnd = std::chrono::high_resolution_clock::now();
+	scoreElapsed = scoreEnd - scoreStart;
+	std::cout << "** Time 6: " << scoreElapsed.count() << " seconds\n";
 
 	return jointLL - jointLLParents;
 }

@@ -23,7 +23,6 @@
 #include "HierarchicalClusterNode.H"
 #include "HierarchicalCluster.H"
 #include "HyperGeomPval.H"
-#include "Distance.H"
 #include "MetaLearner.H"
 
 MetaLearner::MetaLearner()
@@ -798,7 +797,6 @@ MetaLearner::getPredictionError_CrossValid(int foldid)
 	}
 	pFile << "\tRMSE\tNormRMSE\tCoeff_Det_aka_R^2\tCC"<< endl;
 	*/
-	Distance d;
 	vector<double> truevect;
 	vector<double> predvect;
 	for(map<string,int>::iterator vIter=geneModuleID.begin();vIter!=geneModuleID.end();vIter++)
@@ -809,7 +807,6 @@ MetaLearner::getPredictionError_CrossValid(int foldid)
 			continue;
 		}
 		//pFile <<vIter->first;
-		double error=0;
 		double norm=0;
 		double maxval=-100000;
 		double minval=1000000;
@@ -840,7 +837,6 @@ MetaLearner::getPredictionError_CrossValid(int foldid)
 			double trueval=evid->getEvidVal();
 			totalvar=totalvar+((trueval-truemean)*(trueval-truemean));
 			//also called residuals
-			error=error+((predval-trueval)*(predval-trueval));
 			predvect.push_back(predval);
 			//norm=norm+(trueval*trueval);
 			norm=norm+1;
@@ -853,20 +849,6 @@ MetaLearner::getPredictionError_CrossValid(int foldid)
 				minval=trueval;
 			}
 		}
-
-		//Then the true time course
-		/*for(INTINTMAP_ITER dIter=testSet.begin();dIter!=testSet.end();dIter++)
-		{
-			EMAP* evidMap=evMgr->getEvidenceAt(dIter->first);
-			Evidence* evid=(*evidMap)[vId];
-			//pFile <<"\t" <<evid->getEvidVal();
-		}*/
-		double coeff_det=1-(error/totalvar);
-		error=error/norm;
-		error=sqrt(error);
-		// double nmsd=error/(maxval-minval);
-		// double cc=d.computeCC(truevect,predvect);
-		//pFile<< "\t"<<error <<"\t" << nmsd << "\t" << coeff_det <<"\t" << cc <<endl;
 	}
 	//oFile.close();
 	//pFile.close();

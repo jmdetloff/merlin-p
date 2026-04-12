@@ -565,21 +565,44 @@ MetaLearner::start(int f)
 				auto start = std::chrono::high_resolution_clock::now();
 
 				collectMoves(currK,vID);
+
+				auto end = std::chrono::high_resolution_clock::now();
+				std::chrono::duration<double> elapsed = end - start;
+				std::cout << "** Collect time: " << elapsed.count() << " seconds\n";
+
 				if(moveSet.size()==0)
 				{
 					subiter++;
 					continue;
 				}
+
+				start = std::chrono::high_resolution_clock::now();
+
 				sortMoves();
+
+				end = std::chrono::high_resolution_clock::now();
+				elapsed = end - start;
+				std::cout << "** Sort time: " << elapsed.count() << " seconds\n";
+
+				start = std::chrono::high_resolution_clock::now();
+
 				makeMoves();
+
+				end = std::chrono::high_resolution_clock::now();
+				elapsed = end - start;
+				std::cout << "** Make time: " << elapsed.count() << " seconds\n";
+
+				start = std::chrono::high_resolution_clock::now();
+
 				currGlobalScore=getPLLScore();
+
+				end = std::chrono::high_resolution_clock::now();
+				elapsed = end - start;
+				std::cout << "** Score time: " << elapsed.count() << " seconds\n";
+
 				subiter++;
 				showid++;
 				attemptedMoves++;
-
-				auto end = std::chrono::high_resolution_clock::now();
-				std::chrono::duration<double> elapsed = end - start;
-				std::cout << "** Elapsed time: " << elapsed.count() << " seconds\n";
 			}
 			if((currGlobalScore-scorePremodule)<=convThreshold)
 			{

@@ -1624,6 +1624,8 @@ MetaLearner::initCorrelation()
 				cc *= -1;
 			}
 
+			cc = 0.5 * (1 - cc);
+
 			correlation->setValue(cc, i, j);
 			correlation->setValue(cc, j, i);
 		}

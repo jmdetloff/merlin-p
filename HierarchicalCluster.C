@@ -98,12 +98,19 @@ HierarchicalCluster::cluster(map<int,map<string,int>*>& modules, double threshol
 		delete [] distvalues[i];
 	}
 	delete [] distvalues;
+
+	auto popStart = std::chrono::high_resolution_clock::now();
+
 	while(!pairQueue.empty())
 	{
 		Pair* pair = pairQueue.top();
 		pairQueue.pop();
 		delete pair;
 	}
+
+	auto popEnd = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> popElapsed = popEnd - popStart;
+	std::cout << "** Pop time: " << popElapsed.count() << " seconds\n";
 
 	return 0;
 }
@@ -122,47 +129,59 @@ HierarchicalCluster::estimatePairwiseDist(map<int,HierarchicalClusterNode*>& cur
 		}
 	}
 
+	vector<double> denoms(currNodeSet.size(), 0);
+
+	for (int i = 0; i < currNodeSet.size(); i++)
+	{
+		double denom = 0;
+		HierarchicalClusterNode* node = currNodeSet[i];
+		for(map<int,double>::iterator iter = node->attrib.begin(); iter != node->attrib.end(); iter++)
+		{
+			denom += fabs(iter->second);
+		}
+		denoms[i] = denom;
+	}
+
 	vector<Pair*> pairs;
 
-	for(int i=0;i<currNodeSet.size();i++)
+	for (int i = 0; i < currNodeSet.size(); i++)
 	{
-		for(int j=i+1;j<currNodeSet.size();j++)
+		HierarchicalClusterNode* hcNode1 = currNodeSet[i];
+		double den1 = denoms[i];
+
+		for(int j = i + 1; j < currNodeSet.size(); j++)
 		{
-			HierarchicalClusterNode* hcNode1=currNodeSet[i];
-			HierarchicalClusterNode* hcNode2=currNodeSet[j];
+			HierarchicalClusterNode* hcNode2 = currNodeSet[j];
+			double den2 = denoms[j];
 
 			double ccdist = correlation->getValue(hcNode1->varID, hcNode2->varID);
-			ccdist=0.5*(1-ccdist);
 
-			double sharedSign=0;
-			double den1=0;
-			for(map<int,double>::iterator aIter=hcNode1->attrib.begin();aIter!=hcNode1->attrib.end();aIter++)
+			double sharedSign = 0;
+			for(map<int,double>::iterator aIter = hcNode1->attrib.begin(); aIter != hcNode1->attrib.end(); aIter++)
 			{
-				den1=den1+fabs(aIter->second);
-				if(hcNode2->attrib.find(aIter->first)!=hcNode2->attrib.end())
-				{	
-					if((aIter->second*hcNode2->attrib[aIter->first])>=0)
-					{
-						sharedSign=sharedSign+(((fabs(aIter->second)+fabs(hcNode2->attrib[aIter->first])))/2.0);
-					}
+				map<int, double>::iterator bIter = hcNode2->attrib.find(aIter->first);
+				if(bIter == hcNode2->attrib.end())
+				{
+					continue;
+				}
+
+				double weight1 = aIter->second;
+				double weight2 = bIter->second;
+				if(weight1 * weight2 >= 0)
+				{
+					sharedSign += (fabs(weight1) + fabs(weight2)) * 0.5;
 				}
 			}
 
-			double den2=0;
-			for(map<int,double>::iterator aIter=hcNode2->attrib.begin();aIter!=hcNode2->attrib.end();aIter++)
-			{
-				den2=den2+fabs(aIter->second);
-			}
+			double rdist = 1 - sharedSign / (den1 + den2 - sharedSign);
+			double dist = (ccdist + rdist) / 2;
+			distvalues[i][j] = dist;
+			distvalues[j][i] = dist;
 
-			double rdist=1 - (((double)sharedSign)/((double)(den1+den2-sharedSign)));
-			double dist=(ccdist+rdist)/2;
-			distvalues[i][j]=dist;
-			distvalues[j][i]=dist;
-
-			Pair* p=new Pair;
-			p->node1=hcNode1;
-			p->node2=hcNode2;
-			p->value=dist;
+			Pair* p = new Pair;
+			p->node1 = hcNode1;
+			p->node2 = hcNode2;
+			p->value = dist;
 			pairs.push_back(p);
 		}
 	}

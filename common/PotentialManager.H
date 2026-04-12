@@ -33,5 +33,7 @@ class PotentialManager
 		gsl_permutation* perm;
 		vector<double> globalCovariances;
 		vector<double> globalMeans;
+
+		Matrix *covMat;
 };
 #endif

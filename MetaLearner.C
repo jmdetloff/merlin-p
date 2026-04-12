@@ -562,13 +562,7 @@ MetaLearner::start(int f)
 					}
 				}
 
-				auto start = std::chrono::high_resolution_clock::now();
-
 				collectMoves(currK,vID);
-
-				auto end = std::chrono::high_resolution_clock::now();
-				std::chrono::duration<double> elapsed = end - start;
-				std::cout << "** Collect time: " << elapsed.count() << " seconds\n";
 
 				if(moveSet.size()==0)
 				{
@@ -576,29 +570,9 @@ MetaLearner::start(int f)
 					continue;
 				}
 
-				start = std::chrono::high_resolution_clock::now();
-
 				sortMoves();
-
-				end = std::chrono::high_resolution_clock::now();
-				elapsed = end - start;
-				std::cout << "** Sort time: " << elapsed.count() << " seconds\n";
-
-				start = std::chrono::high_resolution_clock::now();
-
 				makeMoves();
-
-				end = std::chrono::high_resolution_clock::now();
-				elapsed = end - start;
-				std::cout << "** Make time: " << elapsed.count() << " seconds\n";
-
-				start = std::chrono::high_resolution_clock::now();
-
 				currGlobalScore=getPLLScore();
-
-				end = std::chrono::high_resolution_clock::now();
-				elapsed = end - start;
-				std::cout << "** Score time: " << elapsed.count() << " seconds\n";
 
 				subiter++;
 				showid++;
@@ -926,6 +900,8 @@ MetaLearner::collectMoves(int currK,int rind)
 	Variable* bestu=NULL;
 	Potential* bestPot=NULL;
 
+	auto start = std::chrono::high_resolution_clock::now();
+
 	for(map<string,int>::iterator uIter=restrictedVarList.begin();uIter!=restrictedVarList.end();uIter++)
 	{
 		int regID=varManager->getVarID(uIter->first.c_str());
@@ -972,8 +948,14 @@ MetaLearner::collectMoves(int currK,int rind)
 		double improvement=0;
 		double score=0;
 
+		auto scoreStart = std::chrono::high_resolution_clock::now();
+
 		Potential* aPot=NULL;
 		getNewPLLScore(u,v,edgeKey,score,improvement,&aPot);
+
+		auto scoreEnd = std::chrono::high_resolution_clock::now();
+		std::chrono::duration<double> scoreElapsed = scoreEnd - scoreStart;
+		std::cout << "** Score time: " << scoreElapsed.count() << " seconds\n";
 
 		bool betterMoveExists = (bestu != NULL) && (bestScoreImprovement >= improvement);
 
@@ -997,6 +979,10 @@ MetaLearner::collectMoves(int currK,int rind)
 		bestScoreImprovement = improvement;
 		bestPot = aPot;
 	}
+
+	auto end = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> elapsed = end - start;
+	std::cout << "** Loop time: " << elapsed.count() << " seconds\n";
 
 	// We could not find a parent to add to v that would improve the score.
 	if((bestu==NULL) || (bestScoreImprovement<=0))

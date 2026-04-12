@@ -900,8 +900,6 @@ MetaLearner::collectMoves(int currK,int rind)
 	Variable* bestu=NULL;
 	Potential* bestPot=NULL;
 
-	auto start = std::chrono::high_resolution_clock::now();
-
 	for(map<string,int>::iterator uIter=restrictedVarList.begin();uIter!=restrictedVarList.end();uIter++)
 	{
 		int regID=varManager->getVarID(uIter->first.c_str());
@@ -948,14 +946,8 @@ MetaLearner::collectMoves(int currK,int rind)
 		double improvement=0;
 		double score=0;
 
-		auto scoreStart = std::chrono::high_resolution_clock::now();
-
 		Potential* aPot=NULL;
 		getNewPLLScore(u,v,edgeKey,score,improvement,&aPot);
-
-		auto scoreEnd = std::chrono::high_resolution_clock::now();
-		std::chrono::duration<double> scoreElapsed = scoreEnd - scoreStart;
-		std::cout << "** Score time: " << scoreElapsed.count() << " seconds\n";
 
 		bool betterMoveExists = (bestu != NULL) && (bestScoreImprovement >= improvement);
 
@@ -980,10 +972,6 @@ MetaLearner::collectMoves(int currK,int rind)
 		bestPot = aPot;
 	}
 
-	auto end = std::chrono::high_resolution_clock::now();
-	std::chrono::duration<double> elapsed = end - start;
-	std::cout << "** Loop time: " << elapsed.count() << " seconds\n";
-
 	// We could not find a parent to add to v that would improve the score.
 	if((bestu==NULL) || (bestScoreImprovement<=0))
 	{
@@ -1004,6 +992,8 @@ MetaLearner::collectMoves(int currK,int rind)
 void
 MetaLearner::getNewPLLScore(Variable* u, Variable* v, string& edgeKey, double& mbScore, double& scoreImprovement, Potential** newdPot)
 {
+	auto scoreStart = std::chrono::high_resolution_clock::now();
+
 	if (edgePresenceProb.find(edgeKey) == edgePresenceProb.end())
 	{
 		cout << "No edge prior for " << edgeKey.c_str() << endl;
@@ -1041,8 +1031,20 @@ MetaLearner::getNewPLLScore(Variable* u, Variable* v, string& edgeKey, double& m
 	INTINTMAP* tSet = &evidenceManager->getTrainingSet();
 	int datasize = tSet->size();
 
+	auto scoreEnd = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> scoreElapsed = scoreEnd - scoreStart;
+	std::cout << "** Time 1: " << scoreElapsed.count() << " seconds\n";
+
+	scoreStart = std::chrono::high_resolution_clock::now();
+
 	double currPrior = varNeighborhoodPrior[factorID] + plus - minus;
 	double condLL = potManager->computeLL(factorID, parentIDs, datasize, newdPot);
+
+	scoreEnd = std::chrono::high_resolution_clock::now();
+	scoreElapsed = scoreEnd - scoreStart;
+	std::cout << "** Time 2: " << scoreElapsed.count() << " seconds\n";
+
+	scoreStart = std::chrono::high_resolution_clock::now();
 
 	double varCnt = (double)parentIDs.size() + 1;
 	double paramCnt = 2 * varCnt + varCnt * (varCnt - 1) / 2;
@@ -1050,6 +1052,10 @@ MetaLearner::getNewPLLScore(Variable* u, Variable* v, string& edgeKey, double& m
 
 	mbScore = condLL + complexityPrior + currPrior;
 	scoreImprovement = mbScore - (*currPLL)[factorID];
+
+	scoreEnd = std::chrono::high_resolution_clock::now();
+	scoreElapsed = scoreEnd - scoreStart;
+	std::cout << "** Time 3: " << scoreElapsed.count() << " seconds\n";
 }
 
 double

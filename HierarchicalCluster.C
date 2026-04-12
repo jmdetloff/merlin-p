@@ -48,10 +48,23 @@ HierarchicalCluster::cluster(map<int,map<string,int>*>& modules, double threshol
 	//The total number of nodes that can be there in a hierarchical cluster is 2n-1
 	int treenodecnt = (nodeSet.size()*2) - 1;
 
+	// Intantiate default distances
+	distvalues = new double*[treenodecnt];
+	for (int i = 0; i < treenodecnt; i++)
+	{
+		distvalues[i] = new double[treenodecnt];
+		for (int j = 0; j < treenodecnt; j++)
+		{
+			distvalues[i][j] = -1000;
+		}
+	}
+
 	auto start = std::chrono::high_resolution_clock::now();
 
 	// Populate distances between the leaf nodes.
-	priority_queue<Pair*, vector<Pair*>, ComparePair> pairQueue = estimatePairwiseDist(currNodeSet, treenodecnt, correlation);
+	vector<Pair*> pairs = estimatePairwiseDist(currNodeSet, correlation);
+
+	priority_queue<Pair*, vector<Pair*>, ComparePair> pairQueue(pairs.begin(), pairs.end());
 
 	auto end = std::chrono::high_resolution_clock::now();
 	std::chrono::duration<double> elapsed = end - start;
@@ -93,7 +106,7 @@ HierarchicalCluster::cluster(map<int,map<string,int>*>& modules, double threshol
 	{
 		delete *it;
 	}
-	for(int i=0;i<treenodecnt;i++)
+	for (int i = 0; i < treenodecnt; i++)
 	{
 		delete [] distvalues[i];
 	}
@@ -101,11 +114,9 @@ HierarchicalCluster::cluster(map<int,map<string,int>*>& modules, double threshol
 
 	auto popStart = std::chrono::high_resolution_clock::now();
 
-	while(!pairQueue.empty())
+	for (int i = 0; i < pairs.size(); i++)
 	{
-		Pair* pair = pairQueue.top();
-		pairQueue.pop();
-		delete pair;
+		delete pairs[i];
 	}
 
 	auto popEnd = std::chrono::high_resolution_clock::now();
@@ -115,20 +126,9 @@ HierarchicalCluster::cluster(map<int,map<string,int>*>& modules, double threshol
 	return 0;
 }
 
-priority_queue<HierarchicalCluster::Pair*, vector<HierarchicalCluster::Pair*>, HierarchicalCluster::ComparePair>
-HierarchicalCluster::estimatePairwiseDist(map<int,HierarchicalClusterNode*>& currNodeSet, int treenodecnt, Matrix* correlation)
+vector<HierarchicalCluster::Pair*>
+HierarchicalCluster::estimatePairwiseDist(map<int,HierarchicalClusterNode*>& currNodeSet, Matrix* correlation)
 {
-	// Intantiate default distances
-	distvalues=new double*[treenodecnt];
-	for(int i=0;i<treenodecnt;i++)
-	{
-		distvalues[i]=new double[treenodecnt];
-		for (int j=0;j<treenodecnt;j++)
-		{
-			distvalues[i][j]=-1000;
-		}
-	}
-
 	vector<double> denoms(currNodeSet.size(), 0);
 
 	for (int i = 0; i < currNodeSet.size(); i++)
@@ -186,9 +186,7 @@ HierarchicalCluster::estimatePairwiseDist(map<int,HierarchicalClusterNode*>& cur
 		}
 	}
 
-	priority_queue<Pair*, vector<Pair*>, ComparePair> pairQueue(pairs.begin(), pairs.end());
-
-	return pairQueue;
+	return pairs;
 }
 
 HierarchicalCluster::Pair*
@@ -216,7 +214,6 @@ HierarchicalCluster::getNextPair(priority_queue<Pair*, vector<Pair*>, ComparePai
 			return pair;
 		}
 
-		delete pair;
 		pairQueue.pop();
 	}
 

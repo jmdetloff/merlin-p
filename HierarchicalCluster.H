@@ -35,7 +35,7 @@ class HierarchicalCluster
 			}
 		};
 
-		priority_queue<Pair*, vector<Pair*>, ComparePair> estimatePairwiseDist(map<int,HierarchicalClusterNode*>& currNodeSet, int treenodecnt, Matrix* correlation);
+		vector<Pair*> estimatePairwiseDist(map<int,HierarchicalClusterNode*>& currNodeSet, Matrix* correlation);
 		void addMergeNode(HierarchicalClusterNode* node, map<int,HierarchicalClusterNode*>& currNodeSet, priority_queue<Pair*, vector<Pair*>, ComparePair>& pairQueue);
 		// int calculatePercentVarianceExplained(map<int,map<string,int>*>& modules);
 

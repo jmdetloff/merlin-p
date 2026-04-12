@@ -151,8 +151,10 @@ double
 PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize, Potential** newPot)
 {
 	int globalVarCount = globalMeans.size();
-	int factorRow = factorID * globalVarCount;
-	double variance = globalCovariances[factorRow + factorID];
+	double* cov = globalCovariances.data();
+	double* factorRowPtr = cov + factorID * globalVarCount;
+
+	double variance = factorRowPtr[factorID];
 	double bias = globalMeans[factorID];
 	INTDBLMAP weights;
 
@@ -172,17 +174,17 @@ PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize
 	for (int i = 0; i < parentCount; i++)
 	{
 		int varAID = parentIDs[i];
-		double factorCovariance = globalCovariances[factorRow + varAID];
+		double factorCovariance = factorRowPtr[varAID];
 		parentMarginalVariances->setValue(factorCovariance, 0, i);
 		covariances->setValue(factorCovariance, 0, i+1);
 		covariances->setValue(factorCovariance, i+1, 0);
 
-		int varARow = varAID * globalVarCount;
+		double* rowA = cov + varAID * globalVarCount;
 
 		for (int j = i; j < parentCount; j++)
 		{
 			int varBID = parentIDs[j];
-			double covariance = globalCovariances[varARow + varBID];
+			double covariance = rowA[varBID];
 			parentCovariances->setValue(covariance, i, j);
 			parentCovariances->setValue(covariance, j, i);
 			covariances->setValue(covariance, i+1, j+1);

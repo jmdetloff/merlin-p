@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cstring>
 #include <math.h>
+#include <chrono>
 
 #include "CommonTypes.H"
 #include "Error.H"
@@ -11,9 +12,6 @@
 
 PotentialManager::PotentialManager()
 {
-	deviations=NULL;
-	meanMat=NULL;
-	covMat=NULL;
 	ludecomp=NULL;
 	perm=NULL;
 }
@@ -28,39 +26,27 @@ PotentialManager::~PotentialManager()
 	{
 		gsl_permutation_free(perm);
 	}
-	if(deviations!=NULL)
-	{
-		delete deviations;
-	}
-	if(meanMat!=NULL)
-	{
-		delete meanMat;
-	}
-	if(covMat!=NULL)
-	{
-		delete covMat;
-	}
 }
 
 int
-PotentialManager::init(EvidenceManager* evMgr, bool randomData)
+PotentialManager::init(EvidenceManager* evMgr, bool randomData, vector<int>& varIDs)
 {
-	reset();
+	auto startTime = std::chrono::high_resolution_clock::now();
 
-	INTINTMAP& trainEvidSet=evMgr->getTrainingSet();
-	EMAP* evidMap=evMgr->getEvidenceAt(trainEvidSet.begin()->first);
-	int varCnt=evidMap->size();
+	INTINTMAP& trainEvidSet = evMgr->getTrainingSet();
+	EMAP* evidMap = evMgr->getEvidenceAt(trainEvidSet.begin()->first);
+	int varCount = evidMap->size();
+	int sampleCount = trainEvidSet.size();
 
-	// data is the data matrix which will have the variable by sample information
-	deviations=new Matrix(varCnt,trainEvidSet.size());
-	meanMat=new Matrix(varCnt,1);
-	meanMat->setAllValues(0);
-	covMat=new Matrix(varCnt,varCnt);
-	covMat->setAllValues(-1);
+	globalMeans.clear();
+	globalCovariances.assign(varCount * varCount, -1);
+
+	// Stores the deviations from the mean for each variable and sample.
+	vector<double> deviations(varCount * sampleCount, 0);
 
 	// Copy all the samples into the data matrix
 	int sampleIndex = 0;
-	for(INTINTMAP_ITER eIter=trainEvidSet.begin();eIter!=trainEvidSet.end();eIter++)
+	for (INTINTMAP_ITER eIter = trainEvidSet.begin(); eIter != trainEvidSet.end(); eIter++)
 	{
 		EMAP* evidMap=NULL;
 		if(randomData)
@@ -71,138 +57,92 @@ PotentialManager::init(EvidenceManager* evMgr, bool randomData)
 		{
 			evidMap=evMgr->getEvidenceAt(eIter->first);
 		}
-		for(EMAP_ITER vIter=evidMap->begin();vIter!=evidMap->end(); vIter++)
+		for (EMAP_ITER vIter = evidMap->begin(); vIter != evidMap->end(); vIter++)
 		{
-			int vId=vIter->first;
-			Evidence* evid=vIter->second;
-			double val=evid->getEvidVal();
-			deviations->setValue(val,vId,sampleIndex);
+			int vId = vIter->first;
+			Evidence* evid = vIter->second;
+			double val = evid->getEvidVal();
+			deviations[vId * sampleCount + sampleIndex] = val;
 		}
 		sampleIndex++;
 	}
 
-	// Done copying. Now we can go over the rows of data and get the means
-	for(int i=0;i<varCnt;i++)
+	// Done copying. Now we can go over data and get the means
+	for (int i = 0; i < varCount; i++)
 	{
-		double sampleSum=0;
-		for(int j=0;j<deviations->getColCnt();j++)
+		double sampleSum = 0;
+		for(int j = 0; j < sampleCount; j++)
 		{
-			sampleSum += deviations->getValue(i,j);
+			sampleSum += deviations[i * sampleCount + j];
 		}
-		double sampleSize=(double) deviations->getColCnt();
-		meanMat->setValue(sampleSum/sampleSize,i,0);
+		globalMeans.push_back(sampleSum / sampleCount);
 	}
 
 	// Finally, use the means to pre-center the data
 	for (int i = 0; i < trainEvidSet.size(); i++)
 	{
-		for (int j = 0; j < varCnt; j++)
+		for (int j = 0; j < varCount; j++)
 		{
-			double dataVal = deviations->getValue(j, i);
-			double mean = meanMat->getValue(j, 0);
-			deviations->setValue(dataVal - mean, j, i);
+			deviations[j * sampleCount + i] -= globalMeans[j];
 		}
 	}
 
-	ludecomp=gsl_matrix_alloc(MAXFACTORSIZE_ALLOC,MAXFACTORSIZE_ALLOC);
-	perm=gsl_permutation_alloc(MAXFACTORSIZE_ALLOC);
-	return 0;
-}
+	int norm = sampleCount - 1;
 
-void
-PotentialManager::precomputeCovariances(vector<int>& varIDs)
-{
+	// Set covariances along the diagonal.
+	for (int i = 0; i < varCount; i++)
+	{
+		double ssd = 0.001;
+		for (int j = 0; j < sampleCount; j++)
+		{
+			double dev = deviations[i * sampleCount + j];
+			ssd += dev * dev;
+		}
+		globalCovariances[i * varCount + i] = ssd / norm;
+	}
 
-	auto startTime = std::chrono::high_resolution_clock::now();
-
-	int varCount = deviations->getRowCnt();
-
-	for (int i = 0; i < varIDs.size(); i++) {
-		int varID = varIDs[i];
-
+	// Set covariances between regulators and all other variables.
+	for (int i = 0; i < varIDs.size(); i++)
+	{
+		int regID = varIDs[i];
 		for (int j = 0; j < varCount; j++)
 		{
-			estimateCovariance(varID, j);
+			if (regID == j)
+			{
+				continue;
+			}
+
+			double ssd = 0;
+			for (int k = 0; k < sampleCount; k++)
+			{
+				double devI = deviations[regID * sampleCount + k];
+				double devJ = deviations[j * sampleCount + k];
+				ssd += devI * devJ;
+			}
+
+			double covariance = ssd / norm;
+			globalCovariances[regID * varCount + j] = covariance;
+			globalCovariances[j * varCount + regID] = covariance;
 		}
 	}
 
 	auto end = std::chrono::high_resolution_clock::now();
 	std::chrono::duration<double> elapsed = end - startTime;
-	std::cout << "** Covariances time: " << elapsed.count() << " seconds\n";
-}
+	std::cout << "** PotentialManager init time: " << elapsed.count() << " seconds\n";
 
-int
-PotentialManager::reset()
-{
-	if(ludecomp!=NULL)
-	{
-		gsl_matrix_free(ludecomp);
-		ludecomp=NULL;
-	}
-	if(perm!=NULL)
-	{
-		gsl_permutation_free(perm);
-		perm=NULL;
-	}
-	if(deviations!=NULL)
-	{
-		delete deviations;
-		deviations=NULL;
-	}
-	if(meanMat!=NULL)
-	{
-		delete meanMat;
-		meanMat=NULL;
-	}
-	if(covMat!=NULL)
-	{
-		delete covMat;
-		covMat=NULL;
-	}
+	// TODO check these sizes to make sure they're valid for how Im now using them
+	ludecomp = gsl_matrix_alloc(MAXFACTORSIZE_ALLOC, MAXFACTORSIZE_ALLOC);
+	perm = gsl_permutation_alloc(MAXFACTORSIZE_ALLOC);
+
 	return 0;
-}
-
-double
-PotentialManager::getCovariance(int uId, int vId)
-{
-	double cov = covMat->getValue(uId, vId);
-	if(cov == -1)
-	{
-		estimateCovariance(uId, vId);
-		cov = covMat->getValue(uId, vId);
-	}
-	return cov;
-}
-
-void
-PotentialManager::estimateCovariance(int uId, int vId)
-{
-	double vmean = meanMat->getValue(vId, 0);
-	double umean = meanMat->getValue(uId, 0);
-
-	double ssd = 0;
-	for (int i = 0; i < deviations->getColCnt(); i++)
-	{
-		double vval = deviations->getValue(vId, i);
-		double uval = deviations->getValue(uId, i);
-		ssd += vval * uval;
-	}
-
-	if (uId == vId)
-	{
-		ssd += 0.001;
-	}
-
-	double var = ssd / ((double)(deviations->getColCnt()-1));
-	covMat->setValue(var, uId, vId);
-	covMat->setValue(var, vId, uId);
 }
 
 Potential*
 PotentialManager::createPotential(int factorID)
 {
-	double variance = getCovariance(factorID, factorID);
-	double bias = meanMat->getValue(factorID, 0);
+	int varCount = globalMeans.size();
+	double variance = globalCovariances[factorID * varCount + factorID];
+	double bias = globalMeans[factorID];
 	INTDBLMAP weights;
 	return new Potential(factorID, variance, bias, weights);
 }
@@ -210,8 +150,9 @@ PotentialManager::createPotential(int factorID)
 double
 PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize, Potential** newPot)
 {
-	double variance = getCovariance(factorID, factorID);
-	double bias = meanMat->getValue(factorID, 0);
+	int globalVarCount = globalMeans.size();
+	double variance = globalCovariances[factorID * globalVarCount + factorID];
+	double bias = globalMeans[factorID];
 	INTDBLMAP weights;
 
 	int parentCount = parentIDs.size();
@@ -230,7 +171,7 @@ PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize
 	for (int i = 0; i < parentCount; i++)
 	{
 		int varAID = parentIDs[i];
-		double factorCovariance = covMat->getValue(factorID, varAID);
+		double factorCovariance = globalCovariances[factorID * globalVarCount + varAID];
 		parentMarginalVariances->setValue(factorCovariance, 0, i);
 		covariances->setValue(factorCovariance, 0, i+1);
 		covariances->setValue(factorCovariance, i+1, 0);
@@ -238,7 +179,7 @@ PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize
 		for (int j = i; j < parentCount; j++)
 		{
 			int varBID = parentIDs[j];
-			double covariance = covMat->getValue(varAID, varBID);
+			double covariance = globalCovariances[varAID * globalVarCount + varBID];
 			parentCovariances->setValue(covariance, i, j);
 			parentCovariances->setValue(covariance, j, i);
 			covariances->setValue(covariance, i+1, j+1);
@@ -257,7 +198,7 @@ PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize
 		int vID = parentIDs[i];
 		double aVal = prod->getValue(0, i);
 		double bVal = parentMarginalVariances->getValue(0, i);
-		double cVal = meanMat->getValue(vID, 0);
+		double cVal = globalMeans[vID];
 		weights[vID] = aVal;
 		variance -= aVal * bVal;
 		bias -= cVal * aVal;

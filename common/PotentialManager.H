@@ -15,11 +15,7 @@ class PotentialManager
 
 		// When init is called PotentialManager clears its internal data and loads
 		// new means and covariances from the provided EvidenceManager.
-		int init(EvidenceManager* evMgr, bool random);
-
-		// Precomputes and caches the covariances between these variables and all other variables.
-		// Intended for use with the regulator variables, whose covariances will be certain to be needed.
-		void precomputeCovariances(vector<int>& varIDs);
+		int init(EvidenceManager* evMgr, bool random, vector<int>& varIDs);
 
 		// Creates a Potential of a single variable.
 		Potential* createPotential(int factorID);
@@ -30,15 +26,12 @@ class PotentialManager
 		double computeLL(int factorID, vector<int>& parentIDs, int sampleSize, Potential** newPot);
 
 	private:
-		int reset();
-		double getCovariance(int,int);
 		void estimateCovariance(int,int);
 		double computeJointLL(Matrix*, Matrix*, double, int);
 
 		gsl_matrix* ludecomp;
 		gsl_permutation* perm;
-		Matrix* deviations;
-		Matrix* meanMat;
-		Matrix* covMat;
+		vector<double> globalCovariances;
+		vector<double> globalMeans;
 };
 #endif

@@ -562,6 +562,8 @@ MetaLearner::start(int f)
 					}
 				}
 
+				auto start = std::chrono::high_resolution_clock::now();
+
 				collectMoves(currK,vID);
 
 				if(moveSet.size()==0)
@@ -577,6 +579,10 @@ MetaLearner::start(int f)
 				subiter++;
 				showid++;
 				attemptedMoves++;
+
+				auto end = std::chrono::high_resolution_clock::now();
+				std::chrono::duration<double> elapsed = end - start;
+				std::cout << "** Var time: " << elapsed.count() << " seconds\n";
 			}
 			if((currGlobalScore-scorePremodule)<=convThreshold)
 			{

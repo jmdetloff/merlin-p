@@ -33,7 +33,7 @@ class PotentialManager
 
 		gsl_matrix* ludecomp;
 		gsl_permutation* perm;
-		Matrix* data;
+		Matrix* deviations;
 		Matrix* meanMat;
 		Matrix* covMat;
 };

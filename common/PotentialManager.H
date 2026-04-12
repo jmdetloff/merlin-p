@@ -17,6 +17,10 @@ class PotentialManager
 		// new means and covariances from the provided EvidenceManager.
 		int init(EvidenceManager* evMgr, bool random);
 
+		// Precomputes and caches the covariances between these variables and all other variables.
+		// Intended for use with the regulator variables, whose covariances will be certain to be needed.
+		void precomputeCovariances(vector<int>& varIDs);
+
 		// Creates a Potential of a single variable.
 		Potential* createPotential(int factorID);
 

@@ -463,6 +463,14 @@ MetaLearner::doCrossValidation(int foldCnt)
 
 		potManager->init(evidenceManager, random);
 
+		vector<int> regIDs;
+		for (map<string,int>::iterator iter = restrictedVarList.begin(); iter != restrictedVarList.end(); iter++)
+		{
+			int regID = varManager->getVarID(iter->first.c_str());
+			regIDs.push_back(regID);
+		}
+		potManager->precomputeCovariances(regIDs);
+
 		factorGraph = new FactorGraph(varManager);
 
 		char outputDir[1024];

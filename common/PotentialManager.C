@@ -109,6 +109,28 @@ PotentialManager::init(EvidenceManager* evMgr, bool randomData)
 	return 0;
 }
 
+void
+PotentialManager::precomputeCovariances(vector<int>& varIDs)
+{
+
+	auto startTime = std::chrono::high_resolution_clock::now();
+
+	int varCount = deviations->getRowCnt();
+
+	for (int i = 0; i < varIDs.size(); i++) {
+		int varID = varIDs[i];
+
+		for (int j = 0; j < varCount; j++)
+		{
+			estimateCovariance(varID, j);
+		}
+	}
+
+	auto end = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> elapsed = end - startTime;
+	std::cout << "** Covariances time: " << elapsed.count() << " seconds\n";
+}
+
 int
 PotentialManager::reset()
 {
@@ -208,7 +230,7 @@ PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize
 	for (int i = 0; i < parentCount; i++)
 	{
 		int varAID = parentIDs[i];
-		double factorCovariance = getCovariance(factorID, varAID);
+		double factorCovariance = covMat->getValue(factorID, varAID);
 		parentMarginalVariances->setValue(factorCovariance, 0, i);
 		covariances->setValue(factorCovariance, 0, i+1);
 		covariances->setValue(factorCovariance, i+1, 0);
@@ -216,7 +238,7 @@ PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize
 		for (int j = i; j < parentCount; j++)
 		{
 			int varBID = parentIDs[j];
-			double covariance = getCovariance(varAID, varBID);
+			double covariance = covMat->getValue(varAID, varBID);
 			parentCovariances->setValue(covariance, i, j);
 			parentCovariances->setValue(covariance, j, i);
 			covariances->setValue(covariance, i+1, j+1);

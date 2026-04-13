@@ -26,8 +26,6 @@ class PotentialManager
 		double computeLL(int factorID, vector<int>& parentIDs, int sampleSize, Potential** newPot);
 
 	private:
-		double computeJointLL(Matrix*, double, int);
-
 		gsl_matrix* ludecomp;
 		gsl_permutation* perm;
 		vector<double> globalMeans;

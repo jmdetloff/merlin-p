@@ -162,8 +162,6 @@ PotentialManager::createPotential(int factorID)
 double
 PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize, Potential** newPot)
 {
-	// auto startTime = std::chrono::high_resolution_clock::now();
-
 	double variance = globalCovariances->getValue(factorID, factorID);
 	double bias = globalMeans[factorID];
 	INTDBLMAP weights;
@@ -175,12 +173,6 @@ PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize
 
 	Matrix *parentCovariances = new Matrix(parentCount, parentCount);
 	Matrix *parentMarginalVariances = new Matrix(1, parentCount);
-
-	// auto end = std::chrono::high_resolution_clock::now();
-	// std::chrono::duration<double> elapsed = end - startTime;
-	// std::cout << "** Time 1: " << elapsed.count() << " seconds\n";
-
-	// startTime = std::chrono::high_resolution_clock::now();
 
 	for (int i = 0; i < parentCount; i++)
 	{
@@ -196,12 +188,6 @@ PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize
 			parentCovariances->setValue(covariance, j, i);
 		}
 	}
-
-	// end = std::chrono::high_resolution_clock::now();
-	// elapsed = end - startTime;
-	// std::cout << "** Time 2: " << elapsed.count() << " seconds\n";
-
-	// startTime = std::chrono::high_resolution_clock::now();
 
 	// Compute the final values for the variance of the conditional gaussian,
 	// plus the regression parameters for the mean of the conditional guassian.
@@ -242,11 +228,4 @@ PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize
 
 	// Finally, compute the conditional log likelihood.
 	return -0.5 * ((sampleSize - 1) + sampleSize * log(2 * PI) + sampleSize * log(variance));
-}
-
-double
-PotentialManager::computeJointLL(Matrix* covariances, double determinant, int sampleSize)
-{
-	int dim=covariances->getRowCnt();
-	return -0.5 * ((sampleSize - 1) * dim + sampleSize * log(determinant) + sampleSize * dim * log(2 * PI));
 }

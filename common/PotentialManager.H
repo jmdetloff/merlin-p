@@ -26,14 +26,11 @@ class PotentialManager
 		double computeLL(int factorID, vector<int>& parentIDs, int sampleSize, Potential** newPot);
 
 	private:
-		void estimateCovariance(int,int);
-		double computeJointLL(Matrix*, Matrix*, double, int);
+		double computeJointLL(Matrix*, double, int);
 
 		gsl_matrix* ludecomp;
 		gsl_permutation* perm;
-		vector<double> globalCovariances;
 		vector<double> globalMeans;
-
-		Matrix *covMat;
+		Matrix *globalCovariances;
 };
 #endif

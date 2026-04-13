@@ -14,7 +14,7 @@ PotentialManager::PotentialManager()
 {
 	ludecomp=NULL;
 	perm=NULL;
-	covMat=nullptr;
+	globalCovariances=nullptr;
 }
 
 PotentialManager::~PotentialManager()
@@ -27,18 +27,18 @@ PotentialManager::~PotentialManager()
 	{
 		gsl_permutation_free(perm);
 	}
-	if(covMat!=nullPtr)
+	if(globalCovariances!=nullptr)
 	{
-		delete covMat;
+		delete globalCovariances;
 	}
 }
 
 int
 PotentialManager::init(EvidenceManager* evMgr, bool randomData, vector<int>& varIDs)
 {
-	if (covMat!= nullptr)
+	if (globalCovariances != nullptr)
 	{
-		delete covMat;
+		delete globalCovariances;
 	}
 
 	auto startTime = std::chrono::high_resolution_clock::now();
@@ -49,10 +49,9 @@ PotentialManager::init(EvidenceManager* evMgr, bool randomData, vector<int>& var
 	int sampleCount = trainEvidSet.size();
 
 	globalMeans.clear();
-	globalCovariances.assign(varCount * varCount, -1);
 
-	// covMat=new Matrix(varCnt,varCnt);
-	// covMat->setAllValues(-1);
+	globalCovariances = new Matrix(varCount, varCount);
+	globalCovariances->setAllValues(-1);
 
 	// Stores the deviations from the mean for each variable and sample.
 	vector<double> deviations(varCount * sampleCount, 0);
@@ -111,8 +110,7 @@ PotentialManager::init(EvidenceManager* evMgr, bool randomData, vector<int>& var
 			double dev = deviations[i * sampleCount + j];
 			ssd += dev * dev;
 		}
-		globalCovariances[i * varCount + i] = ssd / norm;
-		// covMat->setValue(ssd/norm, i, i);
+		globalCovariances->setValue(ssd / norm, i, i);
 	}
 
 	// Set covariances between regulators and all other variables.
@@ -135,11 +133,8 @@ PotentialManager::init(EvidenceManager* evMgr, bool randomData, vector<int>& var
 			}
 
 			double covariance = ssd / norm;
-			globalCovariances[regID * varCount + j] = covariance;
-			globalCovariances[j * varCount + regID] = covariance;
-
-			// covMat->setValue(covariance, regID, j);
-			// covMat->setValue(covariance, j, regID);)
+			globalCovariances->setValue(covariance, regID, j);
+			globalCovariances->setValue(covariance, j, regID);
 		}
 	}
 
@@ -158,8 +153,7 @@ Potential*
 PotentialManager::createPotential(int factorID)
 {
 	int varCount = globalMeans.size();
-	double variance = globalCovariances[factorID * varCount + factorID];
-	// double variance = covMat->getValue(factorID, factorID);
+	double variance = globalCovariances->getValue(factorID, factorID);
 	double bias = globalMeans[factorID];
 	INTDBLMAP weights;
 	return new Potential(factorID, variance, bias, weights);
@@ -168,64 +162,46 @@ PotentialManager::createPotential(int factorID)
 double
 PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize, Potential** newPot)
 {
-	auto startTime = std::chrono::high_resolution_clock::now();
+	// auto startTime = std::chrono::high_resolution_clock::now();
 
-	int globalVarCount = globalMeans.size();
-	double* cov = globalCovariances.data();
-	double* factorRowPtr = cov + factorID * globalVarCount;
-
-	double variance = factorRowPtr[factorID];
-	// double variance = covMat->getValue(factorID, factorID);
+	double variance = globalCovariances->getValue(factorID, factorID);
 	double bias = globalMeans[factorID];
 	INTDBLMAP weights;
 
 	int parentCount = parentIDs.size();
-	int varCount = parentCount + 1;
 
-	// Start by collecting a matrix of the covariances of all the variables in the
-	// joint gaussian, a matrix of all the covariances of the conditioning variables,
+	// Start by collecting a matrix of all the covariances of the conditioning variables,
 	// and the marginal variances of the conditioning variables.
 
-	Matrix *covariances = new Matrix(varCount, varCount);
 	Matrix *parentCovariances = new Matrix(parentCount, parentCount);
 	Matrix *parentMarginalVariances = new Matrix(1, parentCount);
 
-	covariances->setValue(variance, 0, 0);
+	// auto end = std::chrono::high_resolution_clock::now();
+	// std::chrono::duration<double> elapsed = end - startTime;
+	// std::cout << "** Time 1: " << elapsed.count() << " seconds\n";
 
-	auto end = std::chrono::high_resolution_clock::now();
-	std::chrono::duration<double> elapsed = end - startTime;
-	std::cout << "** Time 1: " << elapsed.count() << " seconds\n";
-
-	startTime = std::chrono::high_resolution_clock::now();
+	// startTime = std::chrono::high_resolution_clock::now();
 
 	for (int i = 0; i < parentCount; i++)
 	{
 		int varAID = parentIDs[i];
-		double factorCovariance = factorRowPtr[varAID];
-		// double factorCovariance = covMat->getValue(factorID, varAID);
+		double factorCovariance = globalCovariances->getValue(factorID, varAID);
 		parentMarginalVariances->setValue(factorCovariance, 0, i);
-		covariances->setValue(factorCovariance, 0, i+1);
-		covariances->setValue(factorCovariance, i+1, 0);
-
-		double* rowA = cov + varAID * globalVarCount;
 
 		for (int j = i; j < parentCount; j++)
 		{
 			int varBID = parentIDs[j];
-			double covariance = rowA[varBID];
-			// double covariance = covMat->getValue(varAID, varBID);
+			double covariance = globalCovariances->getValue(varAID, varBID);
 			parentCovariances->setValue(covariance, i, j);
 			parentCovariances->setValue(covariance, j, i);
-			covariances->setValue(covariance, i+1, j+1);
-			covariances->setValue(covariance, j+1, i+1);
 		}
 	}
 
-	end = std::chrono::high_resolution_clock::now();
-	elapsed = end - startTime;
-	std::cout << "** Time 2: " << elapsed.count() << " seconds\n";
+	// end = std::chrono::high_resolution_clock::now();
+	// elapsed = end - startTime;
+	// std::cout << "** Time 2: " << elapsed.count() << " seconds\n";
 
-	startTime = std::chrono::high_resolution_clock::now();
+	// startTime = std::chrono::high_resolution_clock::now();
 
 	// Compute the final values for the variance of the conditional gaussian,
 	// plus the regression parameters for the mean of the conditional guassian.
@@ -246,6 +222,8 @@ PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize
 
 	delete prod;
 	delete parentMarginalVariances;
+	delete parentCovariances;
+	delete parentCovInverse;
 
 	if(variance < 1e-5)
 	{
@@ -256,67 +234,19 @@ PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize
 	// so we should just bail out before computing the LL
 	if(isnan(variance) || isinf(variance))
 	{
-		delete covariances;
-		delete parentCovariances;
-		delete parentCovInverse;
 		return -1;
 	}
 
 	// Now that the conditional Gaussian params are computed, we can create the potential.
 	*newPot = new Potential(factorID, variance, bias, weights);
 
-	// Finally, compute the log likelihood of the conditional Gaussian, by subtracting the
-	// LL of the joint Gaussian of the conditioning variables from that of all variables.
-
-	Matrix *covInverse = covariances->invMatrix(ludecomp, perm);
-	double determinant = covariances->detMatrix(ludecomp, perm);
-	double parentDeterminant = parentCovariances->detMatrix(ludecomp, perm);
-
-	end = std::chrono::high_resolution_clock::now();
-	elapsed = end - startTime;
-	std::cout << "** Time 3: " << elapsed.count() << " seconds\n";
-
-	startTime = std::chrono::high_resolution_clock::now();
-
-	double jointLL = computeJointLL(covariances, covInverse, determinant, sampleSize);
-	double jointLLParents = computeJointLL(parentCovariances, parentCovInverse, parentDeterminant, sampleSize);
-
-	delete covariances;
-	delete covInverse;
-	delete parentCovariances;
-	delete parentCovInverse;
-
-	end = std::chrono::high_resolution_clock::now();
-	elapsed = end - startTime;
-	std::cout << "** Time 4: " << elapsed.count() << " seconds\n";
-
-	return jointLL - jointLLParents;
+	// Finally, compute the conditional log likelihood.
+	return -0.5 * ((sampleSize - 1) + sampleSize * log(2 * PI) + sampleSize * log(variance));
 }
 
 double
-PotentialManager::computeJointLL(Matrix* covariances, Matrix* inverse, double determinant, int sampleSize)
+PotentialManager::computeJointLL(Matrix* covariances, double determinant, int sampleSize)
 {
 	int dim=covariances->getRowCnt();
-
-	// The sum of squared deviations is the covariance matrix * (num samples - 1)
-	Matrix sos = Matrix(dim, dim);
-	for(int i = 0; i < dim; i++)
-	{
-		for(int j = 0; j < dim; j++)
-		{
-			sos.setValue(covariances->getValue(i, j) * (sampleSize - 1), i, j);
-		}
-	}
-
-	// Take trace(inverse covariance * sos)
-	Matrix* m = inverse->multiplyMatrix(&sos);
-	double trace = 0;
-	for(int i = 0; i < dim; i++)
-	{
-		trace += m->getValue(i, i);
-	}
-	delete m;
-
-	double constant = sampleSize * log(determinant) + sampleSize * dim * log(2 * PI);
-	return -0.5 * (trace + constant);
+	return -0.5 * ((sampleSize - 1) * dim + sampleSize * log(determinant) + sampleSize * dim * log(2 * PI));
 }

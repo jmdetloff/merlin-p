@@ -84,7 +84,7 @@ HierarchicalCluster::cluster(map<int,map<string,int>*>& modules, double threshol
 
 		HierarchicalClusterNode *newNode = createMergeNode(nextPair, currNodeSet, nextNodeID);
 		internalNodes.push_back(newNode);
-		addMergeNode(newNode, currNodeSet, pairQueue, threshold);
+		addMergeNode(newNode, currNodeSet, pairs, pairQueue, threshold);
 
 		nextNodeID += 1;
 	}
@@ -231,7 +231,7 @@ HierarchicalCluster::createMergeNode(Pair *pair, map<int,HierarchicalClusterNode
 }
 
 void
-HierarchicalCluster::addMergeNode(HierarchicalClusterNode* node, map<int,HierarchicalClusterNode*>& currNodeSet, priority_queue<Pair*, vector<Pair*>, ComparePair>& pairQueue, double threshold)
+HierarchicalCluster::addMergeNode(HierarchicalClusterNode* node, map<int,HierarchicalClusterNode*>& currNodeSet, vector<Pair*>& pairs, priority_queue<Pair*, vector<Pair*>, ComparePair>& pairQueue, double threshold)
 {
 	HierarchicalClusterNode* c1=node->left;
 	HierarchicalClusterNode* c2=node->right;
@@ -261,6 +261,7 @@ HierarchicalCluster::addMergeNode(HierarchicalClusterNode* node, map<int,Hierarc
 		newPair->node1=nIter->second;
 		newPair->node2=node;
 		pairQueue.push(newPair);
+		pairs.push_back(newPair);
 	}
 
 	currNodeSet[node->id]=node;

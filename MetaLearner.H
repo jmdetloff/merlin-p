@@ -66,7 +66,6 @@ class MetaLearner
 	void getNewPLLScore(Variable* u, Variable* v, string& edgeKey, double& mbScore, double& scoreImprovement, Potential**);
 
 	int dumpAllGraphs(int,int,int);
-	bool checkMBSize(int,int,int);
 
 	int setPriorGraph(const char* aFName, map<string,map<string,double>*>& priorGraph);
 	int redefineModules();

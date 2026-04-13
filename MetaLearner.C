@@ -886,10 +886,16 @@ MetaLearner::collectMoves(int currK,int rind)
 		return 0;
 	}
 
+	// If v already has the max number of parents, dont test adding another.
+	SlimFactor* dFactor = factorGraph->getFactorAt(vID);
+	if(dFactor->mergedMB.size() >= currK)
+	{
+		return 0;
+	}
+
 	int moduleID=geneModuleID[v->getName()];
 	map<string,int>* moduleMembers=moduleGeneSet[moduleID];
 
-	map<string,int> testedEdges;
 	double bestTargetScore=0;
 	double bestScoreImprovement=0;
 	Variable* bestu=NULL;
@@ -912,28 +918,9 @@ MetaLearner::collectMoves(int currK,int rind)
 		edgeKey.append("\t");
 		edgeKey.append(v->getName().c_str());
 
-		if(testedEdges.find(edgeKey)!=testedEdges.end())
-		{
-			continue;
-		}
-		testedEdges[edgeKey]=0;
-
-		if(edgeMap.find(edgeKey)==edgeMap.end())
-		{
-			// If the edge key doesnt exist in the map, then something went wrong during initEdgeSet
-			cout <<"No edge " << edgeKey.c_str() << " u " << u->getID() << " v " << v->getID()<< endl;
-			exit(0);
-		}
-
 		// If the edge already exists, no need to test adding it.
 		int edgeValue=edgeMap[edgeKey];
 		if(edgeValue==1)
-		{
-			continue;
-		}
-
-		// If v already has the max number of parents, dont test adding another.
-		if(!checkMBSize(regID, vIter->first, currK))
 		{
 			continue;
 		}
@@ -987,23 +974,12 @@ MetaLearner::collectMoves(int currK,int rind)
 void
 MetaLearner::getNewPLLScore(Variable* u, Variable* v, string& edgeKey, double& mbScore, double& scoreImprovement, Potential** newdPot)
 {
-	if (edgePresenceProb.find(edgeKey) == edgePresenceProb.end())
-	{
-		cout << "No edge prior for " << edgeKey.c_str() << endl;
-		exit(0);
-	}
-
 	int factorID = v->getID();
 	SlimFactor* dFactor = factorGraph->getFactorAt(factorID);
 
-	bool edgeAlreadyExists = dFactor->mergedMB.find(u->getID()) != dFactor->mergedMB.end();
-
 	// Collect the new set of parents for v
 	vector<int> parentIDs;
-	if (!edgeAlreadyExists)
-	{
-		parentIDs.push_back(u->getID());
-	}
+	parentIDs.push_back(u->getID());
 	for (INTINTMAP_ITER mIter = dFactor->mergedMB.begin(); mIter != dFactor->mergedMB.end(); mIter++)
 	{
 		parentIDs.push_back(mIter->first);
@@ -1235,18 +1211,6 @@ MetaLearner::dumpAllGraphs(int currK,int foldid,int iter)
 	factorGraph->dumpVarMB(oFile,varSet);
 	oFile.close();
 	return 0;
-}
-
-bool 
-MetaLearner::checkMBSize(int u,int v, int currK)
-{
-	bool check=true;
-	SlimFactor* dFactor=factorGraph->getFactorAt(v);
-	if((dFactor->mergedMB.size()>=currK) && (dFactor->mergedMB.find(u)==dFactor->mergedMB.end()))
-	{
-		check=false;
-	}
-	return check;
 }
 
 int

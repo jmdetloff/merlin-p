@@ -103,7 +103,6 @@ class MetaLearner
 	map<string,int> geneModuleID;
 	map<int,map<string,int>*> moduleIndegree;
 	map<string,int> regulatorModuleOutdegree;
-	map<int,int> idVidMap;
 	double clusterThreshold;
 	map<string,int> variableStatus;
 	int currFold;

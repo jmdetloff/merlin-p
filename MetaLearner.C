@@ -318,19 +318,11 @@ MetaLearner::setDefaultModuleMembership()
 	{
 		moduleCnt=30;
 	}
-	map<int,int> matIdvIdMap;
-	int mID=0;
-	for(VSET_ITER vIter=varSet.begin();vIter!=varSet.end();vIter++)
-	{
-		matIdvIdMap[mID]=vIter->first;
-		mID++;
-	}
 	gsl_rng* r=gsl_rng_alloc(gsl_rng_default);
 	//Randomly partition the variables into clusterassignments
 	vector<int> randIndex;
 	double step=1.0/(double)vCnt;
 	map<int,int> usedInit;
-	int maxind=0;
 	for(int i=0;i<vCnt;i++)
 	{
 		double rVal=gsl_ran_flat(r,0,1);
@@ -339,18 +331,9 @@ MetaLearner::setDefaultModuleMembership()
 		{
 			rVal=gsl_ran_flat(r,0,1);
 			rind=(int)(rVal/step);
-			if(rind>maxind)
-			{
-				maxind=rind;
-			}
 		}
-		if(matIdvIdMap.find(rind)==matIdvIdMap.end())
-		{
-			cout <<"Did not find " << rind << " matrixidmap " << endl;
-		}
-		int dataind=matIdvIdMap[rind];
 		usedInit[rind]=0;
-		randIndex.push_back(dataind);
+		randIndex.push_back(rind);
 	}
 	//For each partition estimate the mean and covariance
 	int clusterSize=vCnt/moduleCnt;
@@ -374,7 +357,6 @@ MetaLearner::setDefaultModuleMembership()
 		}
 	}
 	randIndex.clear();
-	matIdvIdMap.clear();
 	usedInit.clear();
 	return 0;
 }
@@ -510,18 +492,12 @@ MetaLearner::start(int f)
 	initEdgeSet();
 	initPhysicalDegree();
 
-	int i=0;
-	VSET& varSet=varManager->getVariableSet();
-	for(VSET_ITER vIter=varSet.begin();vIter!=varSet.end();vIter++)
-	{
-		idVidMap[i]=vIter->first;
-		i++;
-	}
-
 	if(strlen(trueGraphFName)!=0)
 	{
 		return 0;
 	}
+
+	VSET& varSet=varManager->getVariableSet();
 
 	double currGlobalScore=getInitPLLScore();
 	double initScore=getInitPrior();
@@ -539,13 +515,7 @@ MetaLearner::start(int f)
 			double scorePremodule=currGlobalScore;
 			while(subiter<varSet.size())
 			{
-				int vID=idVidMap[subiter];
-				VSET_ITER vIter=varSet.find(vID);
-				if(vIter==varSet.end())
-				{
-					subiter++;
-					continue;
-				}
+				int vID=subiter;
 				Variable* v=varSet[vID];
 				int lastiter=0;
 				if(variableStatus.find(v->getName())!=variableStatus.end())
@@ -855,7 +825,7 @@ MetaLearner::getPredictionError_CrossValid(int foldid)
 }
 
 int
-MetaLearner::collectMoves(int currK,int rind)
+MetaLearner::collectMoves(int currK, int vID)
 {
 	for(int i=0;i<moveSet.size();i++)
 	{
@@ -863,15 +833,9 @@ MetaLearner::collectMoves(int currK,int rind)
 	}
 	moveSet.clear();
 
-	int vID=idVidMap[rind];
 	VSET& varSet=varManager->getVariableSet();
-	VSET_ITER vIter=varSet.find(vID);
-	if(vIter==varSet.end())
-	{
-		return 0;
-	}
+	Variable* v = varSet[vID];
 
-	Variable* v=vIter->second;
 	if(geneModuleID.find(v->getName())==geneModuleID.end())
 	{
 		return 0;
@@ -897,7 +861,7 @@ MetaLearner::collectMoves(int currK,int rind)
 		int regID=varManager->getVarID(uIter->first.c_str());
 
 		// Ensure we can find the regulator, and that it isnt the same node as the target.
-		if(regID==-1 || vIter->first==regID)
+		if(regID==-1 || vID==regID)
 		{
 			continue;
 		}

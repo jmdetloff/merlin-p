@@ -59,10 +59,8 @@ class MetaLearner
 	int clearFoldSpecData();
 	int initEdgeSet();
 
-	int collectMoves(int,int);
-	int sortMoves();
-	int makeMoves();
-	int attemptMove(MetaMove*, INTINTMAP*);
+	int getNextMove(int,int);
+	int makeNextMove();
 	void getNewPLLScore(Variable* u, Variable* v, string& edgeKey, double& mbScore, double& scoreImprovement, Potential**);
 
 	int dumpAllGraphs(int,int,int);
@@ -84,7 +82,7 @@ class MetaLearner
 	double convThreshold;
 	char restrictedFName[1024];
 	map<string,int> edgeMap;
-	vector<MetaMove*> moveSet;
+	MetaMove* nextMove;
 	map<string,int> restrictedVarList;
 	INTDBLMAP* currPLL;
 	char trueGraphFName[1024];
@@ -109,7 +107,6 @@ class MetaLearner
 	char foldoutDirName[1024];
 	int specificFold;
 	HierarchicalCluster hc;
-
 	Matrix* correlation;
 };
 #endif

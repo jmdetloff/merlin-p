@@ -38,6 +38,7 @@ MetaLearner::MetaLearner()
 	factorGraph=nullptr;
 	currPLL=nullptr;
 	correlation=nullptr;
+	nextMove=nullptr;
 }
 
 MetaLearner::~MetaLearner()
@@ -499,6 +500,12 @@ MetaLearner::start(int f)
 
 	VSET& varSet=varManager->getVariableSet();
 
+	for (VSET_ITER vIter=varSet.begin(); vIter != varSet.end(); vIter++)
+	{
+		Variable *var = vIter->second;
+		variableStatus[var->getName()] = 0;
+	}
+
 	double currGlobalScore=getInitPLLScore();
 	double initScore=getInitPrior();
 	int showid=0;
@@ -517,30 +524,27 @@ MetaLearner::start(int f)
 			{
 				int vID=subiter;
 				Variable* v=varSet[vID];
-				int lastiter=0;
-				if(variableStatus.find(v->getName())!=variableStatus.end())
+
+				// If 5 iterations have passed without finding a score improving parent, then skip.
+				int lastiter = variableStatus[v->getName()];
+				if((iter - lastiter) >= 5)
 				{
-					lastiter=variableStatus[v->getName()];
-					if((iter-lastiter)>=5)
-					{
-						cout <<"Skipping " << v->getName() << endl;
-						subiter++;
-						continue;
-					}
+					cout <<"Skipping " << v->getName() << endl;
+					subiter++;
+					continue;
 				}
 
 				auto start = std::chrono::high_resolution_clock::now();
 
-				collectMoves(currK,vID);
+				getNextMove(currK,vID);
 
-				if(moveSet.size()==0)
+				if (nextMove == nullptr)
 				{
 					subiter++;
 					continue;
 				}
 
-				sortMoves();
-				makeMoves();
+				makeNextMove();
 				currGlobalScore=getPLLScore();
 
 				subiter++;
@@ -825,13 +829,13 @@ MetaLearner::getPredictionError_CrossValid(int foldid)
 }
 
 int
-MetaLearner::collectMoves(int currK, int vID)
+MetaLearner::getNextMove(int currK, int vID)
 {
-	for(int i=0;i<moveSet.size();i++)
+	if (nextMove != nullptr)
 	{
-		delete moveSet[i];
+		delete nextMove;
+		nextMove = nullptr;
 	}
-	moveSet.clear();
 
 	VSET& varSet=varManager->getVariableSet();
 	Variable* v = varSet[vID];
@@ -915,13 +919,12 @@ MetaLearner::collectMoves(int currK, int vID)
 		return 0;
 	}
 
-	MetaMove* move=new MetaMove;
-	move->setSrcVertex(bestu->getID());
-	move->setTargetVertex(v->getID());
-	move->setTargetMBScore(bestTargetScore);
-	move->setScoreImprovement(bestScoreImprovement);
-	move->setDestPot(bestPot);
-	moveSet.push_back(move);
+	nextMove = new MetaMove;
+	nextMove->setSrcVertex(bestu->getID());
+	nextMove->setTargetVertex(v->getID());
+	nextMove->setTargetMBScore(bestTargetScore);
+	nextMove->setScoreImprovement(bestScoreImprovement);
+	nextMove->setDestPot(bestPot);
 
 	return 0;
 }
@@ -1034,125 +1037,68 @@ MetaLearner::getEdgePrior(int tfID, int targetID)
 	return prior;
 }
 
-int 
-MetaLearner::sortMoves()
-{
-	for(int m=0;m<moveSet.size();m++)
-	{
-		for(int n=m+1;n<moveSet.size();n++)
-		{
-			MetaMove* m1=moveSet[m];
-			MetaMove* m2=moveSet[n];
-			if(m1->getScoreImprovement()<m2->getScoreImprovement())
-			{
-				moveSet[m]=m2;
-				moveSet[n]=m1;
-			}
-		}
-	}
-	return 0;
-}
-
 int
-MetaLearner::makeMoves()
+MetaLearner::makeNextMove()
 {
-	INTINTMAP* affectedVariables=new INTINTMAP;
-	int successMove=0;
-	double netScoreDelta=0;
-	for(int m=0;m<moveSet.size();m++)
-	{
-		MetaMove* move=moveSet[m];
-		int pool=0;
-		if(attemptMove(move,affectedVariables)==0)
-		{
-			successMove++;
-			netScoreDelta=netScoreDelta+move->getScoreImprovement();
-		}
-		else
-		{
-			Potential* apot=move->getDestPot();
-			delete apot;
-		}
-	}
-	delete affectedVariables;
-	//cout <<"Total successful moves " << successMove << " out of total " << moveSet.size() << " with net score improvement " << netScoreDelta<< endl;
-	return 0;
-}
+	VSET& varSet = varManager->getVariableSet();
+	Variable* u = varSet[nextMove->getSrcVertex()];
+	Variable* v = varSet[nextMove->getTargetVertex()];
 
-int
-MetaLearner::attemptMove(MetaMove* move, INTINTMAP* affectedVars)
-{
-	VSET& varSet=varManager->getVariableSet();
 	string edgeKey;
-	Variable* u=varSet[move->getSrcVertex()];
-	Variable* v=varSet[move->getTargetVertex()];
 	edgeKey.append(u->getName().c_str());
 	edgeKey.append("\t");
 	edgeKey.append(v->getName().c_str());
 
-	if(edgeMap.find(edgeKey)==edgeMap.end())
-	{
-		cout <<"Edge " << edgeKey << " not found " << endl;
-		return -1;
-	}
+	SlimFactor* dFactor = factorGraph->getFactorAt(nextMove->getTargetVertex());
 
-	if((affectedVars->find(move->getSrcVertex())!=affectedVars->end()) || (affectedVars->find(move->getTargetVertex())!=affectedVars->end()))
-	{
-		return -1;
-	}
-	(*affectedVars)[move->getTargetVertex()]=0;
-
-	SlimFactor* dFactor=factorGraph->getFactorAt(move->getTargetVertex());
-	if(dFactor->mergedMB.find(move->getSrcVertex())!=dFactor->mergedMB.end())
-	{
-		cout <<"Stop !! Trying to add the same edge " <<edgeKey << "   "<< v->getName() << endl;
-	}
-	dFactor->mergedMB[move->getSrcVertex()]=0;
+	// Clean up the old potential
 	delete dFactor->potFunc;
-	dFactor->potFunc=move->getDestPot();
-	(*currPLL)[dFactor->fId]=move->getTargetMBScore();
 
-	//Get the module and update it's indegree
-	int mID=geneModuleID[v->getName()];
+	// Add the new parent and update the potential
+	dFactor->mergedMB[nextMove->getSrcVertex()] = 0;
+	dFactor->potFunc = nextMove->getDestPot();
+
+	// Update the current score for this factor
+	(*currPLL)[dFactor->fId] = nextMove->getTargetMBScore();
+
+	int mID = geneModuleID[v->getName()];
+
+	// Get or create an indegree map for this module
 	map<string,int>* currIndegree=NULL;
-	if(moduleIndegree.find(mID)==moduleIndegree.end())
+	if(moduleIndegree.find(mID) == moduleIndegree.end())
 	{
-		currIndegree=new map<string,int>;
-		moduleIndegree[mID]=currIndegree;
+		currIndegree = new map<string,int>;
+		moduleIndegree[mID] = currIndegree;
 	}
 	else
 	{
-		currIndegree=moduleIndegree[mID];
+		currIndegree = moduleIndegree[mID];
 	}
-	if(currIndegree->find(v->getName())==currIndegree->end())
+
+	// Increment the count of edges from u to the module of v
+	if(currIndegree->find(u->getName()) == currIndegree->end())
 	{
-		//cout <<"Adding new regulator " << u->getName() <<" to module " << mID << endl;
-		(*currIndegree)[u->getName()]=1;
+		(*currIndegree)[u->getName()] = 1;
 	}
 	else
 	{	
-		//cout <<"Updating regulator " << u->getName() <<" to module " << mID << endl;
-		(*currIndegree)[u->getName()]=(*currIndegree)[u->getName()]+1;
+		(*currIndegree)[u->getName()] += 1;
 	}
-	if(regulatorModuleOutdegree.find(u->getName())==regulatorModuleOutdegree.end())
+
+	// Increment the count of edges from u
+	if(regulatorModuleOutdegree.find(u->getName()) == regulatorModuleOutdegree.end())
 	{
-		regulatorModuleOutdegree[u->getName()]=1;
+		regulatorModuleOutdegree[u->getName()] = 1;
 	}
 	else
 	{
-		regulatorModuleOutdegree[u->getName()]=regulatorModuleOutdegree[u->getName()]+1;
+		regulatorModuleOutdegree[u->getName()] += 1;
 	}
-	//cout << "Made move for " << edgeKey.c_str() << endl;
-	edgeMap[edgeKey]=1;
-	int curriter=0;
-	if(variableStatus.find(v->getName())==variableStatus.end())
-	{
-		variableStatus[v->getName()]=curriter;
-	}
-	else
-	{
-		variableStatus[v->getName()]=variableStatus[v->getName()]+1;
-	}
+
+	edgeMap[edgeKey] = 1;
+
+	variableStatus[v->getName()] += 1;
+
 	return 0;
 }
 

@@ -528,7 +528,6 @@ MetaLearner::start(int f)
 	int showid=0;
 	int moduleiter=0;
 	bool notConvergedTop=true;
-	vector<int> randOrder;
 	while(moduleiter<1 && notConvergedTop)
 	{
 		int iter=0;
@@ -538,16 +537,8 @@ MetaLearner::start(int f)
 			int attemptedMoves=0;
 			int subiter=0;
 			double scorePremodule=currGlobalScore;
-			randOrder.clear();
-			evidenceManager->populateRandIntegers(rnd,randOrder,varSet.size(),varSet.size());
 			while(subiter<varSet.size())
 			{
-				int rID=randOrder[subiter];
-				if(idVidMap.find(rID)==idVidMap.end())
-				{
-					cout <<"Variable at  " << rID << " just not found " << endl;
-					exit(0);
-				}
 				int vID=idVidMap[subiter];
 				VSET_ITER vIter=varSet.find(vID);
 				if(vIter==varSet.end())

@@ -1009,12 +1009,15 @@ MetaLearner::getNewPLLScore(Variable* u, Variable* v, string& edgeKey, double& m
 		parentIDs.push_back(mIter->first);
 	}
 
+	VSET& varSet = varManager->getVariableSet();
+
 	double plus = 0;
 	double minus = 0;
 	for (vector<int>::iterator iter = parentIDs.begin(); iter != parentIDs.end(); iter++)
 	{
+		Variable* parentVar = varSet[*iter];
 		double eprior = getEdgePrior(*iter, factorID);
-		double moduleContrib = getModuleContribLogistic((string&)v->getName(), (string&)u->getName());
+		double moduleContrib = getModuleContribLogistic((string&)v->getName(), (string&)parentVar->getName());
 		double edgeProb = 1 / (1 + exp(-1 * (eprior + moduleContrib)));
 		double edgeProbOld = 1 / (1 + exp(-1 * eprior));
 		minus += log(1 - edgeProbOld);

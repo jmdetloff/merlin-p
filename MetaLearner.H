@@ -61,7 +61,7 @@ class MetaLearner
 
 	int getNextMove(int,int);
 	int makeNextMove();
-	void getNewPLLScore(Variable* u, Variable* v, string& edgeKey, double& mbScore, double& scoreImprovement, Potential**);
+	void getNewPLLScore(Variable* u, Variable* v, vector<int>& parentIDs, string& edgeKey, double& mbScore, double& scoreImprovement, Potential**);
 
 	int dumpAllGraphs(int,int,int);
 

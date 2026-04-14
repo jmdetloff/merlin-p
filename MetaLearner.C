@@ -852,6 +852,13 @@ MetaLearner::getNextMove(int currK, int vID)
 		return 0;
 	}
 
+	// Collect the new set of parents for v
+	vector<int> parentIDs;
+	for (INTINTMAP_ITER iter = dFactor->mergedMB.begin(); iter != dFactor->mergedMB.end(); iter++)
+	{
+		parentIDs.push_back(iter->first);
+	}
+
 	int moduleID=geneModuleID[v->getName()];
 	map<string,int>* moduleMembers=moduleGeneSet[moduleID];
 
@@ -884,11 +891,15 @@ MetaLearner::getNextMove(int currK, int vID)
 			continue;
 		}
 
-		double improvement=0;
-		double score=0;
+		double improvement = 0;
+		double score = 0;
+		Potential* aPot = NULL;
 
-		Potential* aPot=NULL;
-		getNewPLLScore(u,v,edgeKey,score,improvement,&aPot);
+		parentIDs.push_back(u->getID());
+
+		getNewPLLScore(u, v, parentIDs, edgeKey, score, improvement, &aPot);
+
+		parentIDs.pop_back();
 
 		bool betterMoveExists = (bestu != NULL) && (bestScoreImprovement >= improvement);
 
@@ -930,19 +941,9 @@ MetaLearner::getNextMove(int currK, int vID)
 }
 
 void
-MetaLearner::getNewPLLScore(Variable* u, Variable* v, string& edgeKey, double& mbScore, double& scoreImprovement, Potential** newdPot)
+MetaLearner::getNewPLLScore(Variable* u, Variable* v, vector<int>& parentIDs, string& edgeKey, double& mbScore, double& scoreImprovement, Potential** newdPot)
 {
 	int factorID = v->getID();
-	SlimFactor* dFactor = factorGraph->getFactorAt(factorID);
-
-	// Collect the new set of parents for v
-	vector<int> parentIDs;
-	parentIDs.push_back(u->getID());
-	for (INTINTMAP_ITER mIter = dFactor->mergedMB.begin(); mIter != dFactor->mergedMB.end(); mIter++)
-	{
-		parentIDs.push_back(mIter->first);
-	}
-
 	VSET& varSet = varManager->getVariableSet();
 
 	double plus = 0;

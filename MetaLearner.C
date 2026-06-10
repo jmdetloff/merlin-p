@@ -798,40 +798,52 @@ MetaLearner::getNextMove(int maxNumRegs, int vID)
 	unordered_map<int, Variable*>& varSet = varManager->getVariableSet();
 	Variable* v = varSet[vID];
 
-	if(geneModuleID.find(v->getName()) == geneModuleID.end())
-	{
+	if(geneModuleID.find(v->getName()) == geneModuleID.end()) {
 		return nullptr;
 	}
 
 	// If v already has the max number of parents, dont test adding another.
 	SlimFactor* dFactor = factorGraph->getFactorAt(vID);
-	if(dFactor->mergedMB.size() >= maxNumRegs)
-	{
+	if(dFactor->mergedMB.size() >= maxNumRegs) {
 		return nullptr;
 	}
 
 	// Collect the new set of parents for v
 	vector<int> parentIDs;
-	for (INTINTMAP_ITER iter = dFactor->mergedMB.begin(); iter != dFactor->mergedMB.end(); iter++)
-	{
+	for (INTINTMAP_ITER iter = dFactor->mergedMB.begin(); iter != dFactor->mergedMB.end(); iter++) {
 		parentIDs.push_back(iter->first);
 	}
 
-	int moduleID=geneModuleID[v->getName()];
-	map<string,int>* moduleMembers=moduleGeneSet[moduleID];
+	double existingParentPlus = 0;
+	double existingParentMinus = 0;
+	for (vector<int>::iterator iter = parentIDs.begin(); iter != parentIDs.end(); iter++) {
+		Variable* parentVar = varSet[*iter];
+		double eprior = getEdgePrior(*iter, vID);
+		double moduleContrib = getModuleContribLogistic((string&)v->getName(), (string&)parentVar->getName());
+		double edgeProb = 1 / (1 + exp(-1 * (eprior + moduleContrib)));
+		double edgeProbOld = 1 / (1 + exp(-1 * eprior));
+		existingParentMinus += log(1 - edgeProbOld);
+		existingParentPlus += log(edgeProb);
+	}
 
-	double bestTargetScore=0;
-	double bestScoreImprovement=0;
-	Variable* bestu=NULL;
-	Potential* bestPot=NULL;
+	double existingParentPrior = varNeighborhoodPrior[vID] + exitingParentPlus - existingParentMinus;
 
-	for(map<string,int>::iterator uIter=restrictedVarList.begin();uIter!=restrictedVarList.end();uIter++)
-	{
-		int regID=varManager->getVarID(uIter->first);
+	INTINTMAP* tSet = &evidenceManager->getTrainingSet();
+	int datasize = tSet->size();
+
+	int moduleID = geneModuleID[v->getName()];
+	map<string,int>* moduleMembers = moduleGeneSet[moduleID];
+
+	double bestTargetScore = 0;
+	double bestScoreImprovement = 0;
+	Variable* bestu = NULL;
+	Potential* bestPot = NULL;
+
+	for(map<string,int>::iterator uIter=restrictedVarList.begin();uIter!=restrictedVarList.end();uIter++) {
+		int regID = varManager->getVarID(uIter->first);
 
 		// Ensure we can find the regulator, and that it isnt the same node as the target.
-		if(regID==-1 || vID==regID)
-		{
+		if(regID == -1 || vID == regID) {
 			continue;
 		}
 
@@ -843,36 +855,40 @@ MetaLearner::getNextMove(int maxNumRegs, int vID)
 		edgeKey.append(v->getName().c_str());
 
 		// If the edge already exists, no need to test adding it.
-		int edgeValue=edgeMap[edgeKey];
-		if(edgeValue==1)
-		{
+		int edgeValue = edgeMap[edgeKey];
+		if(edgeValue == 1) {
 			continue;
 		}
 
-		double improvement = 0;
-		double score = 0;
-		Potential* aPot = NULL;
+		double candidateEdgePrior = getEdgePrior(regID, vID);
+		double candidateModuleContrib = getModuleContribLogistic((string&)v->getName(), (string&)u->getName());
+		double candidateEdgeProb = 1 / (1 + exp(-1 * (candidateEdgePrior + candidateModuleContrib)));
+		double candidateEdgeProbOld = 1 / (1 + exp(-1 * candidateEdgePrior));
+		double candidatePlus = log(candidateEdgeProb);
+		double candidateMinus = log(1 - candidateEdgeProbOld);
+		double candidatePrior = parentCurrPrior + candidatePlus - candidateMinus;
 
 		parentIDs.push_back(u->getID());
 
-		getNewPLLScore(u, v, parentIDs, edgeKey, score, improvement, &aPot);
+		Potential* aPot = NULL;
+		double condLL = potManager->computeLL(vID, parentIDs, datasize, &aPot);
 
 		parentIDs.pop_back();
+
+		double score = condLL + candidatePrior;
+		double improvement = score - (*currPLL)[vID];
 
 		bool betterMoveExists = (bestu != NULL) && (bestScoreImprovement >= improvement);
 
 		// If there is no score improvement, cleanup aPot and continue.
-		if (improvement < 0 || betterMoveExists)
-		{
-			if (aPot != NULL)
-			{
+		if (improvement < 0 || betterMoveExists) {
+			if (aPot != NULL) {
 				delete aPot;
 			}
 			continue;
 		}
 
-		if(bestPot != NULL)
-		{
+		if(bestPot != NULL) {
 			delete bestPot;
 		}
 
@@ -883,8 +899,7 @@ MetaLearner::getNextMove(int maxNumRegs, int vID)
 	}
 
 	// If we could not find a parent to add to v that would improve the score:
-	if((bestu == NULL) || (bestScoreImprovement <= 0))
-	{
+	if((bestu == NULL) || (bestScoreImprovement <= 0)) {
 		return nullptr;
 	}
 
@@ -895,34 +910,6 @@ MetaLearner::getNextMove(int maxNumRegs, int vID)
 	nextMove->setScoreImprovement(bestScoreImprovement);
 	nextMove->setDestPot(bestPot);
 	return nextMove;
-}
-
-void
-MetaLearner::getNewPLLScore(Variable* u, Variable* v, vector<int>& parentIDs, string& edgeKey, double& mbScore, double& scoreImprovement, Potential** newdPot)
-{
-	int factorID = v->getID();
-	unordered_map<int, Variable*>& varSet = varManager->getVariableSet();
-
-	double plus = 0;
-	double minus = 0;
-	for (vector<int>::iterator iter = parentIDs.begin(); iter != parentIDs.end(); iter++)
-	{
-		Variable* parentVar = varSet[*iter];
-		double eprior = getEdgePrior(*iter, factorID);
-		double moduleContrib = getModuleContribLogistic((string&)v->getName(), (string&)parentVar->getName());
-		double edgeProb = 1 / (1 + exp(-1 * (eprior + moduleContrib)));
-		double edgeProbOld = 1 / (1 + exp(-1 * eprior));
-		minus += log(1 - edgeProbOld);
-		plus += log(edgeProb);
-	}
-
-	INTINTMAP* tSet = &evidenceManager->getTrainingSet();
-	int datasize = tSet->size();
-
-	double currPrior = varNeighborhoodPrior[factorID] + plus - minus;
-	double condLL = potManager->computeLL(factorID, parentIDs, datasize, newdPot);
-	mbScore = condLL + currPrior;
-	scoreImprovement = mbScore - (*currPLL)[factorID];
 }
 
 double

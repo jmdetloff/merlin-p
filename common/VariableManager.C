@@ -6,15 +6,6 @@
 #include "Variable.H"
 #include "VariableManager.H"
 
-
-VariableManager::VariableManager()
-{
-}
-
-VariableManager::~VariableManager()
-{
-}
-
 //Reads the schema of the variables
 
 Error::ErrorCode
@@ -73,18 +64,16 @@ VariableManager::isValid(int varID,int varVal)
 	return rVar->isValidValue(varVal);
 }
 
-map<int,Variable*>&
+unordered_map<int, Variable*>&
 VariableManager::getVariableSet()
 {
 	return variableSet;
 }
 
-
 Variable*
 VariableManager::getVariableAt(int vId)
 {
-	if(variableSet.find(vId)==variableSet.end())
-	{
+	if(variableSet.find(vId) == variableSet.end()) {
 		cout << "Illegal variable id " << vId << endl;
 		return NULL;
 	}

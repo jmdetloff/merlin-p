@@ -310,8 +310,8 @@ MetaLearner::readModuleMembership(const char* aFName)
 int
 MetaLearner::setDefaultModuleMembership()
 {
-	VSET& varSet=varManager->getVariableSet();
-	int vCnt=varSet.size();
+	unordered_map<int, Variable*>& varSet = varManager->getVariableSet();
+	int vCnt = varSet.size();
 	int moduleCnt=(int) sqrt(vCnt/2);
 	if(moduleCnt>30)
 	{
@@ -363,7 +363,6 @@ MetaLearner::setDefaultModuleMembership()
 int
 MetaLearner::initEdgePriorMeta(const string& priorName, map<string,map<string,double>*>& graph, unordered_map<int, unordered_map<int, double>*>& edgePriors)
 {
-	VSET& varSet=varManager->getVariableSet();
 	cout << "Initializing prior: \"" << priorName << "\" " << endl;
 	for(map<string,int>::iterator rIter=restrictedVarList.begin();rIter!=restrictedVarList.end();rIter++)
 	{
@@ -476,10 +475,9 @@ MetaLearner::start(int f)
 	initEdgeSet();
 	initPhysicalDegree();
 
-	VSET& varSet=varManager->getVariableSet();
+	unordered_map<int, Variable*>& varSet = varManager->getVariableSet();
 
-	for (VSET_ITER vIter=varSet.begin(); vIter != varSet.end(); vIter++)
-	{
+	for (auto vIter = varSet.begin(); vIter != varSet.end(); vIter++) {
 		Variable *var = vIter->second;
 		variableStatus[var->getName()] = 0;
 	}
@@ -567,11 +565,10 @@ double
 MetaLearner::getInitPLLScore()
 {
 	double initScore=0;
-	VSET& varSet=varManager->getVariableSet();
+	unordered_map<int, Variable*>& varSet = varManager->getVariableSet();
 	//Initially we just sum up the marginal likelihoods
 	currPLL=new INTDBLMAP;
-	for(VSET_ITER vIter=varSet.begin();vIter!=varSet.end();vIter++)
-	{
+	for(auto vIter = varSet.begin(); vIter != varSet.end(); vIter++) {
 		if(varNeighborhoodPrior.find(vIter->first)==varNeighborhoodPrior.end())
 		{
 			continue;
@@ -620,18 +617,16 @@ MetaLearner::clearFoldSpecData()
 int
 MetaLearner::initEdgeSet()
 {
-	VSET& varSet=varManager->getVariableSet();
-	for(VSET_ITER uIter=varSet.begin();uIter!=varSet.end();uIter++)
-	{
-		Variable* u=varSet[uIter->first];
+	unordered_map<int, Variable*>& varSet = varManager->getVariableSet();
+	for(auto uIter = varSet.begin(); uIter != varSet.end(); uIter++) {
+		Variable* u = varSet[uIter->first];
 		if((restrictedVarList.size()>0) && (restrictedVarList.find(u->getName())==restrictedVarList.end()))
 		{
 			continue;
 		}
 
-		for(VSET_ITER vIter=varSet.begin();vIter!=varSet.end();vIter++)
-		{
-			if(uIter->first==vIter->first)
+		for(auto vIter = varSet.begin(); vIter != varSet.end(); vIter++) {
+			if(uIter->first == vIter->first)
 			{
 				continue;
 			}
@@ -688,7 +683,7 @@ MetaLearner::initEdgeSet()
 int
 MetaLearner::getPredictionError_CrossValid(int foldid)
 {
-	VSET& varSet=varManager->getVariableSet();
+	unordered_map<int, Variable*>& varSet = varManager->getVariableSet();
 	char foldoutDirName[1024];
 	sprintf(foldoutDirName,"%s/fold%d",outputDirName,foldid);
 	INTINTMAP& testSet=evidenceManager->getTestSet();
@@ -802,7 +797,7 @@ MetaLearner::getPredictionError_CrossValid(int foldid)
 MetaMove*
 MetaLearner::getNextMove(int maxNumRegs, int vID)
 {
-	VSET& varSet=varManager->getVariableSet();
+	unordered_map<int, Variable*>& varSet = varManager->getVariableSet();
 	Variable* v = varSet[vID];
 
 	if(geneModuleID.find(v->getName()) == geneModuleID.end())
@@ -842,7 +837,7 @@ MetaLearner::getNextMove(int maxNumRegs, int vID)
 			continue;
 		}
 
-		Variable* u=varSet[regID];
+		Variable* u = varSet[regID];
 
 		string edgeKey;
 		edgeKey.append(u->getName().c_str());
@@ -908,7 +903,7 @@ void
 MetaLearner::getNewPLLScore(Variable* u, Variable* v, vector<int>& parentIDs, string& edgeKey, double& mbScore, double& scoreImprovement, Potential** newdPot)
 {
 	int factorID = v->getID();
-	VSET& varSet = varManager->getVariableSet();
+	unordered_map<int, Variable*>& varSet = varManager->getVariableSet();
 
 	double plus = 0;
 	double minus = 0;
@@ -990,7 +985,7 @@ MetaLearner::getEdgePrior(int tfID, int targetID)
 void
 MetaLearner::makeMove(MetaMove* nextMove, int currIteration)
 {
-	VSET& varSet = varManager->getVariableSet();
+	unordered_map<int, Variable*>& varSet = varManager->getVariableSet();
 	Variable* u = varSet[nextMove->getSrcVertex()];
 	Variable* v = varSet[nextMove->getTargetVertex()];
 
@@ -1053,11 +1048,11 @@ MetaLearner::makeMove(MetaMove* nextMove, int currIteration)
 int
 MetaLearner::dumpAllGraphs(int maxNumRegs,int foldid,int iter)
 {
-	VSET& varSet=varManager->getVariableSet();
+	unordered_map<int, Variable*>& varSet=varManager->getVariableSet();
 	char aFName[1024];
 	sprintf(aFName,"%s/prediction_k%d.txt",foldoutDirName,maxNumRegs+1);
 	ofstream oFile(aFName);
-	factorGraph->dumpVarMB(oFile,varSet);
+	factorGraph->dumpVarMB(oFile, varSet);
 	oFile.close();
 	return 0;
 }
@@ -1137,8 +1132,8 @@ MetaLearner::initPhysicalDegree()
 int
 MetaLearner::getEnrichedTFs(map<string,int>& tfSet,map<string,int>* genes,map<string,map<string,double>*>& edgeSet)
 {
-	VSET& varSet=varManager->getVariableSet();
-	int total=varSet.size();
+	unordered_map<int, Variable*>& varSet = varManager->getVariableSet();
+	int total = varSet.size();
 	int k=genes->size();
 	HyperGeomPval hgp;
 	for(map<string,map<string,double>*>::iterator fIter=edgeSet.begin();fIter!=edgeSet.end();fIter++)
@@ -1297,7 +1292,7 @@ MetaLearner::redefineModules()
 
 	// Read in the new module assignments
 	int largestModuleID=0;
-	VSET& varSet=varManager->getVariableSet();
+	unordered_map<int, Variable*>& varSet = varManager->getVariableSet();
 	for(map<int,map<string,int>*>::iterator mIter=newModules.begin();mIter!=newModules.end();mIter++)
 	{
 		moduleGeneSet[mIter->first]=mIter->second;
@@ -1359,7 +1354,7 @@ void
 MetaLearner::initCorrelationDistances()
 {
 	INTINTMAP& samples = evidenceManager->getTrainingSet();
-	VSET& varSet = varManager->getVariableSet();
+	unordered_map<int, Variable*>& varSet = varManager->getVariableSet();
 
 	int varCount = varSet.size();
 	int sampleCount = samples.size();

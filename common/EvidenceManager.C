@@ -100,9 +100,9 @@ EvidenceManager::randomizeEvidence(gsl_rng* r, VariableManager* vMgr)
 		randEvidenceSet.push_back(evidMap);
 	}
 	//Populate variable wise
-	VSET& variableSet=vMgr->getVariableSet();
+	unordered_map<int, Variable*>& variableSet = vMgr->getVariableSet();
 	int* randInds=new int[trainIndex.size()];
-	for(VSET_ITER vIter=variableSet.begin();vIter!=variableSet.end();vIter++)
+	for(auto vIter=variableSet.begin();vIter!=variableSet.end();vIter++)
 	{
 		//generate a random vector of indices ranging from 0 to evidenceSet.size()-1
 		populateRandIntegers(r,randInds,trainIndex,trainIndex.size());

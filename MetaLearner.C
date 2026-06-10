@@ -5,6 +5,7 @@
 #include <sys/timeb.h>
 #include <sys/time.h>
 #include <time.h>
+#include <chrono>
 
 #include "Error.H"
 #include "Variable.H"
@@ -511,22 +512,44 @@ MetaLearner::start(int f)
 			int lastiter = variableStatus[v->getName()];
 			if((iter - lastiter) >= 5)
 			{
-				// cout <<"   Skipping gene " << v->getName() << "; no parents added in last 5 iters." << endl;
+				cout <<"   Skipping gene " << v->getName() << "; no parents added in last 5 iters." << endl;
 				subiter++;
 				continue;
 			}
+
+			auto start = std::chrono::high_resolution_clock::now();
 
 			MetaMove* nextMove = getNextMove(maxNumRegs, vID);
 			if (nextMove == nullptr)
 			{
+				cout <<"   No move found " << v->getName() << endl;
 				subiter++;
 				continue;
 			}
 
+			auto end = std::chrono::high_resolution_clock::now();
+
+			double seconds = std::chrono::duration<double>(end - start).count();
+			std::cout << "Get move duration: " << seconds << " seconds\n";
+
+			start = std::chrono::high_resolution_clock::now();
+
 			makeMove(nextMove, iter);
 			delete nextMove;
 
+			end = std::chrono::high_resolution_clock::now();
+
+			seconds = std::chrono::duration<double>(end - start).count();
+			std::cout << "Make move duration: " << seconds << " seconds\n";
+
+			start = std::chrono::high_resolution_clock::now();
+
 			currGlobalScore=getPLLScore();
+
+			end = std::chrono::high_resolution_clock::now();
+
+			seconds = std::chrono::duration<double>(end - start).count();
+			std::cout << "Update score duration: " << seconds << " seconds\n";
 
 			subiter++;
 		}

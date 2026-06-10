@@ -94,9 +94,9 @@ class MetaLearner
 	bool random;
 	bool randomData;
 	map<int,map<string,int>*> moduleGeneSet;
-	map<string,int> geneModuleID;
-	map<int,map<string,int>*> moduleIndegree;
-	map<string,int> regulatorModuleOutdegree;
+	unordered_map<string, int> geneModuleID;
+	unordered_map<int, unordered_map<string, int>*> moduleIndegree;
+	unordered_map<string, int> regulatorModuleOutdegree;
 	double clusterThreshold;
 	map<string,int> variableStatus;
 	int currFold;

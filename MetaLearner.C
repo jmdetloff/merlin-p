@@ -693,7 +693,7 @@ MetaLearner::getPredictionError_CrossValid(int foldid)
 		//for each gc, get the expected value of this datapoint
 		EMAP* evidMap=evidenceManager->getEvidenceAt(dIter->first);
 
-		for(map<string,int>::iterator vIter=geneModuleID.begin();vIter!=geneModuleID.end();vIter++)
+		for(auto vIter=geneModuleID.begin();vIter!=geneModuleID.end();vIter++)
 		{
 			int vId=varManager->getVarID(vIter->first);
 			if(vId==-1)
@@ -737,7 +737,7 @@ MetaLearner::getPredictionError_CrossValid(int foldid)
 	*/
 	vector<double> truevect;
 	vector<double> predvect;
-	for(map<string,int>::iterator vIter=geneModuleID.begin();vIter!=geneModuleID.end();vIter++)
+	for(auto vIter=geneModuleID.begin();vIter!=geneModuleID.end();vIter++)
 	{
 		int vId=varManager->getVarID(vIter->first);
 		if(vId==-1)
@@ -1009,10 +1009,10 @@ MetaLearner::makeMove(MetaMove* nextMove, int currIteration)
 	int mID = geneModuleID[v->getName()];
 
 	// Get or create an indegree map for this module
-	map<string,int>* currIndegree=NULL;
+	unordered_map<string, int>* currIndegree = NULL;
 	if(moduleIndegree.find(mID) == moduleIndegree.end())
 	{
-		currIndegree = new map<string,int>;
+		currIndegree = new unordered_map<string, int>;
 		moduleIndegree[mID] = currIndegree;
 	}
 	else
@@ -1062,7 +1062,6 @@ MetaLearner::initPhysicalDegree()
 {
 	for(map<int,map<string,int>*>::iterator mIter=moduleGeneSet.begin();mIter!=moduleGeneSet.end();mIter++)
 	{
-		map<string,int>* indegree=NULL;
 		map<string,map<string,int>*> innet;
 		map<string,int>* geneSet=mIter->second;
 		for(map<string,map<string,map<string,double>*>*>::iterator gpIter=priorgraphmap.begin();gpIter!=priorgraphmap.end();gpIter++)
@@ -1093,6 +1092,8 @@ MetaLearner::initPhysicalDegree()
 				}
 			}
 		}
+
+		unordered_map<string, int>* indegree = NULL;
 		for (map<string,map<string,int>*>::iterator tItr=innet.begin();tItr!=innet.end();tItr++)
 		{
 			string tf = tItr->first;
@@ -1103,16 +1104,16 @@ MetaLearner::initPhysicalDegree()
 			}
 			if (indegree == NULL)
 			{
-				indegree=new map<string,int>;
+				indegree = new unordered_map<string, int>;
 			}
 			(*indegree)[tf] = ttgts->size();
 		}
 
-		if(indegree!=NULL)
+		if(indegree != NULL)
 		{
-			moduleIndegree[mIter->first]=indegree;
+			moduleIndegree[mIter->first] = indegree;
 			cout << "Module " << mIter->first << ": " << geneSet->size() << " genes, " << indegree->size() << " enriched TFs" << endl;
-			for(map<string,int>::iterator dIter=indegree->begin();dIter!=indegree->end();dIter++)
+			for(auto dIter = indegree->begin(); dIter != indegree->end(); dIter++)
 			{
 				cout << " Enriched TF " << dIter->first << ": " << dIter->second << " target genes in this module across prior networks" <<endl;
 				if(regulatorModuleOutdegree.find(dIter->first)==regulatorModuleOutdegree.end())
@@ -1175,33 +1176,35 @@ MetaLearner::getEnrichedTFs(map<string,int>& tfSet,map<string,int>* genes,map<st
 double
 MetaLearner::getModuleContribLogistic(string& tgtName, string& tfName)
 {
-	if(geneModuleID.find(tgtName)==geneModuleID.end())
-	{
+	auto moduleIter = geneModuleID.find(tgtName);
+	if(moduleIter == geneModuleID.end()) {
 		return 0;
 	}
 
-	int moduleID=geneModuleID[tgtName];
-	if(moduleIndegree.find(moduleID)==moduleIndegree.end())
-	{
+	int moduleID = moduleIter->second;
+
+	auto degreeIter = moduleIndegree.find(moduleID);
+	if(degreeIter == moduleIndegree.end()) {
 		return 0;
 	}
 
-	map<string,int>* moddegree=moduleIndegree[moduleID];
-	if(moddegree->find(tfName)==moddegree->end())
-	{
+	unordered_map<string,int>* moddegree = degreeIter->second;
+
+	auto regIter = moddegree->find(tfName);
+	if(regIter == moddegree->end()) {
 		return 0;
 	}
 
-	int degree=(*moddegree)[tfName];
+	int degree = regIter->second;
+	int regDegree = 0;
 
-	int regDegree=0;
-	if(regulatorModuleOutdegree.find(tfName)!=regulatorModuleOutdegree.end())
-	{
-		regDegree=regulatorModuleOutdegree[tfName];
+	auto outDegreeIter = regulatorModuleOutdegree.find(tfName);
+	if(outDegreeIter != regulatorModuleOutdegree.end()) {
+		regDegree = outDegreeIter->second;
 	}
 
-	double contrib=((double) degree)/((double) regDegree);
-	return beta_motif*contrib;
+	double contrib= ((double) degree) / ((double) regDegree);
+	return beta_motif * contrib;
 }
 
 //To redefine the modules we will start with the original set of modules
@@ -1279,7 +1282,7 @@ MetaLearner::redefineModules()
 	moduleGeneSet.clear();
 	geneModuleID.clear();
 	regulatorModuleOutdegree.clear();
-	for(map<int,map<string,int>*>::iterator mIter=moduleIndegree.begin();mIter!=moduleIndegree.end();mIter++)
+	for(auto mIter=moduleIndegree.begin(); mIter!=moduleIndegree.end(); mIter++)
 	{
 		mIter->second->clear();
 		delete mIter->second;
@@ -1297,7 +1300,7 @@ MetaLearner::redefineModules()
 	{
 		moduleGeneSet[mIter->first]=mIter->second;
 		map<string,int>* geneSet=mIter->second;
-		map<string,int>* indegree=new map<string,int>;
+		unordered_map<string, int>* indegree = new unordered_map<string,int>;
 		for(map<string,int>::iterator gIter=geneSet->begin();gIter!=geneSet->end();gIter++)
 		{
 			modFile << gIter->first <<"\t" << mIter->first << endl;

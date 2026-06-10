@@ -62,7 +62,7 @@ MetaLearner::initEdgePriorMeta_All()
 	for(map<string,map<string,map<string,double>*>*>::iterator gIter=priorgraphmap.begin();gIter!=priorgraphmap.end();gIter++)
 	{
 		map<string,map<string,double>*>* priorgraph = gIter->second;
-		map<int,INTDBLMAP*>* edgeprior = new map<int,INTDBLMAP*>();
+		unordered_map<int, unordered_map<int, double>*>* edgeprior = new unordered_map<int, unordered_map<int, double>*>();
 		edgepriormap[gIter->first] = edgeprior;
 		initEdgePriorMeta(gIter->first,*priorgraph,*edgeprior);
 	}
@@ -361,7 +361,7 @@ MetaLearner::setDefaultModuleMembership()
 }
 
 int
-MetaLearner::initEdgePriorMeta(const string& priorName, map<string,map<string,double>*>& graph, map<int,INTDBLMAP*>& edgePriors)
+MetaLearner::initEdgePriorMeta(const string& priorName, map<string,map<string,double>*>& graph, unordered_map<int, unordered_map<int, double>*>& edgePriors)
 {
 	VSET& varSet=varManager->getVariableSet();
 	cout << "Initializing prior: \"" << priorName << "\" " << endl;
@@ -380,35 +380,25 @@ MetaLearner::initEdgePriorMeta(const string& priorName, map<string,map<string,do
 		map<string,double>* tgtSet=graph[rIter->first];
 		for(map<string,double>::iterator vIter=tgtSet->begin();vIter!=tgtSet->end();vIter++)
 		{
-			INTDBLMAP* edgePriorGene=NULL;
-			int tgtId=varManager->getVarID(vIter->first);
-			if(tgtId==-1)
-			{
+			unordered_map<int, double>* edgePriorGene = NULL;
+			int tgtId = varManager->getVarID(vIter->first);
+			if (tgtId == -1) {
 				continue;
 			}
-			if(edgePriors.find(tgtId)==edgePriors.end())
-			{
-				edgePriorGene=new INTDBLMAP;
-				edgePriors[tgtId]=edgePriorGene;
-			}
-			else
-			{
-				edgePriorGene=edgePriors[tgtId];
+			if (edgePriors.find(tgtId) == edgePriors.end()) {
+				edgePriorGene = new unordered_map<int, double>;
+				edgePriors[tgtId] = edgePriorGene;
+			} else {
+				edgePriorGene = edgePriors[tgtId];
 			}
 			double ewt=fabs(vIter->second);
-			if(edgePriorGene->find(regId)==edgePriorGene->end())
-			{
-				//(*edgePriorGene)[regId]=vIter->second;
-				(*edgePriorGene)[regId]=ewt;
-			}
-			else
-			{
-				//(*edgePriorGene)[regId]=(*edgePriorGene)[regId]+vIter->second;
-				(*edgePriorGene)[regId]=(*edgePriorGene)[regId]+ewt;
+			if (edgePriorGene->find(regId) == edgePriorGene->end()) {
+				(*edgePriorGene)[regId] = ewt;
+			} else {
+				(*edgePriorGene)[regId] += ewt;
 			}
 			tfhit++;
 		}
-		// cout << " Regulator "<< rIter->first << " has " << tfhit << " targets" << endl;
 	}
 
 	return 0;
@@ -974,34 +964,26 @@ MetaLearner::getInitPLLScore(int vId)
 double
 MetaLearner::getEdgePrior(int tfID, int targetID)
 {
-	INTDBLMAP* regPriors=NULL;
-	double prior=beta1;
 	double fwt = 0;
-	for (map<string,map<int,INTDBLMAP*>*>::iterator pItr=edgepriormap.begin(); pItr!=edgepriormap.end(); pItr++)
-	{
-		double eweight=0;
-		double gbeta = 0;
-		map<int,INTDBLMAP*>* edgeprior = pItr->second;
-		if(edgeprior->find(targetID)!=edgeprior->end())
-		{
-			regPriors=(*edgeprior)[targetID];
-			if(regPriors->find(tfID)!=regPriors->end())
-			{
-				eweight=(*regPriors)[tfID];
-				gbeta = betamap[pItr->first];
-				fwt = fwt + gbeta*eweight;
-			}
+	for (map<string, unordered_map<int, unordered_map<int, double>*>*>::iterator pItr = edgepriormap.begin(); pItr != edgepriormap.end(); pItr++) {
+
+		unordered_map<int, unordered_map<int, double>*>* edgeprior = pItr->second;
+		unordered_map<int, unordered_map<int, double>*>::iterator targetIter = edgeprior->find(targetID);
+		if (targetIter == edgeprior->end()) {
+			continue;
 		}
+
+		unordered_map<int, double>* regPriors = targetIter->second;
+		unordered_map<int, double>::iterator regIter = regPriors->find(tfID);
+		if (regIter == regPriors->end()) {
+			continue;
+		}
+
+		double eWeight = regIter->second;
+		double gBeta = betamap[pItr->first];
+		fwt += gBeta * eWeight;
 	}
-	prior=beta1+fwt;
-	//if(prior<1e-6)
-	//{
-	//	prior=1e-6;
-	//}
-	//if(prior==1)
-	//{
-	//	prior=1-1e-6;
-	//}
+	double prior = beta1 + fwt;
 	return prior;
 }
 

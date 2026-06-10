@@ -2,6 +2,7 @@
 #define _META_LEARNER_
 
 #include <map>
+#include <unordered_map>
 #include "CommonTypes.H"
 #include "HierarchicalCluster.H"
 
@@ -30,7 +31,7 @@ class MetaLearner
 	int setConvergenceThreshold(double);
 	int setRestrictedList(const char*);
 	int setPreRandomizeSplit();
-	int initEdgePriorMeta(const string& priorName, map<string,map<string,double>*>& graph, map<int,INTDBLMAP*>& edgePrior);
+	int initEdgePriorMeta(const string& priorName, map<string,map<string,double>*>& graph, unordered_map<int, unordered_map<int, double>*>& edgePrior);
 	int doCrossValidation(int);
 	int setGlobalEvidenceManager(EvidenceManager*);
 	int setVariableManager(VariableManager*);
@@ -47,7 +48,7 @@ class MetaLearner
 	int start(int);
 	int initEdgePriorMeta_All();
 	map <string,double> betamap;
-	map <string,map<int,INTDBLMAP*>*> edgepriormap;
+	map<string, unordered_map<int, unordered_map<int, double>*>*> edgepriormap;
 	map <string,map<string,map<string,double>*>*> priorgraphmap;
 
 	double getInitPLLScore();
@@ -78,7 +79,7 @@ class MetaLearner
 	int maxFactorSizeApprox;
 	double convThreshold;
 	char restrictedFName[1024];
-	map<string,int> edgeMap;
+	unordered_map<string,int> edgeMap;
 	map<string,int> restrictedVarList;
 	INTDBLMAP* currPLL;
 	map<int,double> finalScores;

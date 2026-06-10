@@ -2,7 +2,7 @@
 #define _VARIABLE_MANAGER
 
 #include <string>
-#include <map>
+#include <unordered_map>
 
 using namespace std;
 

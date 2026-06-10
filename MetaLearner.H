@@ -81,7 +81,7 @@ class MetaLearner
 	char restrictedFName[1024];
 	unordered_map<string,int> edgeMap;
 	map<string,int> restrictedVarList;
-	INTDBLMAP* currPLL;
+	unordered_map<int, double>* currPLL;
 	map<int,double> finalScores;
 	bool preRandomizeSplit;
 	gsl_rng* rnd;

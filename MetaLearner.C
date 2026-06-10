@@ -567,7 +567,7 @@ MetaLearner::getInitPLLScore()
 	double initScore=0;
 	unordered_map<int, Variable*>& varSet = varManager->getVariableSet();
 	//Initially we just sum up the marginal likelihoods
-	currPLL=new INTDBLMAP;
+	currPLL=new unordered_map<int, double>;
 	for(auto vIter = varSet.begin(); vIter != varSet.end(); vIter++) {
 		if(varNeighborhoodPrior.find(vIter->first)==varNeighborhoodPrior.end())
 		{
@@ -586,13 +586,11 @@ double
 MetaLearner::getPLLScore()
 {
 	double gScore=0;
-	for(INTDBLMAP_ITER dIter=currPLL->begin();dIter!=currPLL->end();dIter++)
-	{
-		if(isnan(gScore) || isinf(gScore))
-		{
+	for(auto dIter = currPLL->begin(); dIter != currPLL->end(); dIter++) {
+		if(isnan(gScore) || isinf(gScore)) {
 			cout << "Found nan/inf for variable " << dIter->first << endl;
 		}
-		gScore=gScore+dIter->second;
+		gScore += dIter->second;
 	}
 	return gScore;
 }

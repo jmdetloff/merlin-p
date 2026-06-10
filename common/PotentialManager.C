@@ -163,40 +163,48 @@ PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize
 	// Start by collecting a matrix of all the covariances of the conditioning variables,
 	// and the marginal variances of the conditioning variables.
 
-	Matrix parentCovariances(parentCount, parentCount);
-	Matrix parentMarginalVariances(1, parentCount);
+	gsl_matrix* parentCovariances = gsl_matrix_alloc(parentCount, parentCount);
+	gsl_vector* parentMarginalVariances = gsl_vector_alloc(parentCount);
 
 	for (int i = 0; i < parentCount; i++) {
 		int varAID = parentIDs[i];
-		double factorCovariance = globalCovariances->getValue(factorID, varAID);
-		parentMarginalVariances.setValue(factorCovariance, 0, i);
+		double marginalCovariance = globalCovariances->getValue(factorID, varAID);
+		gsl_vector_set(parentMarginalVariances, i, marginalCovariance);
 
 		for (int j = i; j < parentCount; j++) {
 			int varBID = parentIDs[j];
 			double covariance = globalCovariances->getValue(varAID, varBID);
-			parentCovariances.setValue(covariance, i, j);
-			parentCovariances.setValue(covariance, j, i);
+			gsl_matrix_set(parentCovariances, i, j, covariance);
+			gsl_matrix_set(parentCovariances, j, i, covariance);
 		}
 	}
 
 	// Compute the final values for the variance of the conditional gaussian,
 	// plus the regression parameters for the mean of the conditional guassian.
 
-	Matrix* parentCovInverse = parentCovariances.invMatrix(ludecomp, perm);
-	Matrix* prod = parentMarginalVariances.multiplyMatrix(parentCovInverse);
+	gsl_vector* x = gsl_vector_alloc(parentCount);
+
+	gsl_permutation* permutation = gsl_permutation_alloc(parentCount);
+
+	int signum = 0;
+	gsl_linalg_LU_decomp(parentCovariances, permutation, &signum);
+
+	gsl_linalg_LU_solve(parentCovariances, permutation, parentMarginalVariances, x);
 
 	for (int i = 0; i < parentCount; i++) {
 		int vID = parentIDs[i];
-		double aVal = prod->getValue(0, i);
-		double bVal = parentMarginalVariances.getValue(0, i);
+		double aVal = gsl_vector_get(x, i);
+		double bVal = gsl_vector_get(parentMarginalVariances, i);
 		double cVal = globalMeans[vID];
 		weights[vID] = aVal;
 		variance -= aVal * bVal;
 		bias -= cVal * aVal;
 	}
 
-	delete prod;
-	delete parentCovInverse;
+	gsl_vector_free(x);
+	gsl_vector_free(parentMarginalVariances);
+	gsl_permutation_free(permutation);
+	gsl_matrix_free(parentCovariances);
 
 	if(variance < 1e-5) {
 		variance = 1e-5;

@@ -14,12 +14,12 @@ class VariableManager
 		VariableManager();
 		~VariableManager();
 		Error::ErrorCode readVariables(const char*);
-		int getVarID(const char*);
+		int getVarID(const string& varName);
 		bool isValid(int,int);
 		map<int,Variable*>& getVariableSet();
 		Variable* getVariableAt(int);
 	private:
-		map<string,int> varNameIDMap;
+		unordered_map<string, int> varNameIDMap;
 		map<int,Variable*> variableSet;
 		int globalVarId;
 };

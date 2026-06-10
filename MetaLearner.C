@@ -367,7 +367,7 @@ MetaLearner::initEdgePriorMeta(const string& priorName, map<string,map<string,do
 	cout << "Initializing prior: \"" << priorName << "\" " << endl;
 	for(map<string,int>::iterator rIter=restrictedVarList.begin();rIter!=restrictedVarList.end();rIter++)
 	{
-		int regId=varManager->getVarID(rIter->first.c_str());
+		int regId=varManager->getVarID(rIter->first);
 		if(regId==-1)
 		{
 			continue;
@@ -381,7 +381,7 @@ MetaLearner::initEdgePriorMeta(const string& priorName, map<string,map<string,do
 		for(map<string,double>::iterator vIter=tgtSet->begin();vIter!=tgtSet->end();vIter++)
 		{
 			INTDBLMAP* edgePriorGene=NULL;
-			int tgtId=varManager->getVarID(vIter->first.c_str());
+			int tgtId=varManager->getVarID(vIter->first);
 			if(tgtId==-1)
 			{
 				continue;
@@ -446,7 +446,7 @@ MetaLearner::doCrossValidation(int foldCnt)
 		vector<int> regIDs;
 		for (map<string,int>::iterator iter = restrictedVarList.begin(); iter != restrictedVarList.end(); iter++)
 		{
-			int regID = varManager->getVarID(iter->first.c_str());
+			int regID = varManager->getVarID(iter->first);
 			regIDs.push_back(regID);
 		}
 
@@ -710,7 +710,7 @@ MetaLearner::getPredictionError_CrossValid(int foldid)
 
 		for(map<string,int>::iterator vIter=geneModuleID.begin();vIter!=geneModuleID.end();vIter++)
 		{
-			int vId=varManager->getVarID(vIter->first.c_str());
+			int vId=varManager->getVarID(vIter->first);
 			if(vId==-1)
 			{
 				continue;
@@ -754,7 +754,7 @@ MetaLearner::getPredictionError_CrossValid(int foldid)
 	vector<double> predvect;
 	for(map<string,int>::iterator vIter=geneModuleID.begin();vIter!=geneModuleID.end();vIter++)
 	{
-		int vId=varManager->getVarID(vIter->first.c_str());
+		int vId=varManager->getVarID(vIter->first);
 		if(vId==-1)
 		{
 			continue;
@@ -844,7 +844,7 @@ MetaLearner::getNextMove(int maxNumRegs, int vID)
 
 	for(map<string,int>::iterator uIter=restrictedVarList.begin();uIter!=restrictedVarList.end();uIter++)
 	{
-		int regID=varManager->getVarID(uIter->first.c_str());
+		int regID=varManager->getVarID(uIter->first);
 
 		// Ensure we can find the regulator, and that it isnt the same node as the target.
 		if(regID==-1 || vID==regID)
@@ -1161,7 +1161,7 @@ MetaLearner::getEnrichedTFs(map<string,int>& tfSet,map<string,int>* genes,map<st
 	HyperGeomPval hgp;
 	for(map<string,map<string,double>*>::iterator fIter=edgeSet.begin();fIter!=edgeSet.end();fIter++)
 	{
-		int uID=varManager->getVarID(fIter->first.c_str());
+		int uID=varManager->getVarID(fIter->first);
 		if(uID<0)
 		{
 			continue;
@@ -1171,10 +1171,8 @@ MetaLearner::getEnrichedTFs(map<string,int>& tfSet,map<string,int>* genes,map<st
 		int n=0;
 		int hit=0;
 		for(map<string,double>::iterator gIter=tgtSet->begin();gIter!=tgtSet->end();gIter++)
-		//for(map<string,int>::iterator gIter=genes->begin();gIter!=genes->end();gIter++)
 		{
-
-			int vID=varManager->getVarID(gIter->first.c_str());
+			int vID=varManager->getVarID(gIter->first);
             if(vID<0)
             {
                 continue;
@@ -1253,7 +1251,7 @@ MetaLearner::redefineModules()
 		map<string,int>* moduleMembers=gIter->second;
 		for(map<string,int>::iterator mIter=moduleMembers->begin();mIter!=moduleMembers->end();mIter++)
 		{
-			int mID=varManager->getVarID(mIter->first.c_str());
+			int mID=varManager->getVarID(mIter->first);
 			if(mID<0)
 			{
 				continue;
@@ -1327,7 +1325,7 @@ MetaLearner::redefineModules()
 		{
 			modFile << gIter->first <<"\t" << mIter->first << endl;
 			geneModuleID[gIter->first]=mIter->first;
-			int mID=varManager->getVarID(gIter->first.c_str());
+			int mID=varManager->getVarID(gIter->first);
 			SlimFactor* mFactor=factorGraph->getFactorAt(mID);
 			INTINTMAP& mbvars1=mFactor->mergedMB;
 

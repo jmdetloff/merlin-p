@@ -163,35 +163,32 @@ PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize
 	// Start by collecting a matrix of all the covariances of the conditioning variables,
 	// and the marginal variances of the conditioning variables.
 
-	Matrix *parentCovariances = new Matrix(parentCount, parentCount);
-	Matrix *parentMarginalVariances = new Matrix(1, parentCount);
+	Matrix parentCovariances(parentCount, parentCount);
+	Matrix parentMarginalVariances(1, parentCount);
 
-	for (int i = 0; i < parentCount; i++)
-	{
+	for (int i = 0; i < parentCount; i++) {
 		int varAID = parentIDs[i];
 		double factorCovariance = globalCovariances->getValue(factorID, varAID);
-		parentMarginalVariances->setValue(factorCovariance, 0, i);
+		parentMarginalVariances.setValue(factorCovariance, 0, i);
 
-		for (int j = i; j < parentCount; j++)
-		{
+		for (int j = i; j < parentCount; j++) {
 			int varBID = parentIDs[j];
 			double covariance = globalCovariances->getValue(varAID, varBID);
-			parentCovariances->setValue(covariance, i, j);
-			parentCovariances->setValue(covariance, j, i);
+			parentCovariances.setValue(covariance, i, j);
+			parentCovariances.setValue(covariance, j, i);
 		}
 	}
 
 	// Compute the final values for the variance of the conditional gaussian,
 	// plus the regression parameters for the mean of the conditional guassian.
 
-	Matrix* parentCovInverse = parentCovariances->invMatrix(ludecomp, perm);
-	Matrix* prod = parentMarginalVariances->multiplyMatrix(parentCovInverse);
+	Matrix* parentCovInverse = parentCovariances.invMatrix(ludecomp, perm);
+	Matrix* prod = parentMarginalVariances.multiplyMatrix(parentCovInverse);
 
-	for (int i = 0; i < parentCount; i++)
-	{
+	for (int i = 0; i < parentCount; i++) {
 		int vID = parentIDs[i];
 		double aVal = prod->getValue(0, i);
-		double bVal = parentMarginalVariances->getValue(0, i);
+		double bVal = parentMarginalVariances.getValue(0, i);
 		double cVal = globalMeans[vID];
 		weights[vID] = aVal;
 		variance -= aVal * bVal;
@@ -199,19 +196,15 @@ PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize
 	}
 
 	delete prod;
-	delete parentMarginalVariances;
-	delete parentCovariances;
 	delete parentCovInverse;
 
-	if(variance < 1e-5)
-	{
+	if(variance < 1e-5) {
 		variance = 1e-5;
 	}
 
 	// If the variance is invalid, then we don't want to attempt adding this edge,
 	// so we should just bail out before computing the LL
-	if(isnan(variance) || isinf(variance))
-	{
+	if(isnan(variance) || isinf(variance)) {
 		return -1;
 	}
 

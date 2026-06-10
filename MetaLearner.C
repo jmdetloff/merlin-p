@@ -826,7 +826,7 @@ MetaLearner::getNextMove(int maxNumRegs, int vID)
 		existingParentPlus += log(edgeProb);
 	}
 
-	double existingParentPrior = varNeighborhoodPrior[vID] + exitingParentPlus - existingParentMinus;
+	double existingParentPrior = varNeighborhoodPrior[vID] + existingParentPlus - existingParentMinus;
 
 	INTINTMAP* tSet = &evidenceManager->getTrainingSet();
 	int datasize = tSet->size();
@@ -866,7 +866,7 @@ MetaLearner::getNextMove(int maxNumRegs, int vID)
 		double candidateEdgeProbOld = 1 / (1 + exp(-1 * candidateEdgePrior));
 		double candidatePlus = log(candidateEdgeProb);
 		double candidateMinus = log(1 - candidateEdgeProbOld);
-		double candidatePrior = parentCurrPrior + candidatePlus - candidateMinus;
+		double candidatePrior = existingParentPrior + candidatePlus - candidateMinus;
 
 		parentIDs.push_back(u->getID());
 

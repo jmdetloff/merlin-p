@@ -1212,67 +1212,77 @@ MetaLearner::getModuleContribLogistic(string& tgtName, string& tfName)
 int
 MetaLearner::redefineModules()
 {
+	auto start = std::chrono::high_resolution_clock::now();
+
 	INTINTMAP& tSet=evidenceManager->getTrainingSet();
 
-	if (correlationDistances == nullptr)
-	{
+	if (correlationDistances == nullptr) {
 		initCorrelationDistances();
 	}
+
+	auto end = std::chrono::high_resolution_clock::now();
+    double seconds = std::chrono::duration<double>(end - start).count();
+    std::cout << "Point 1: " << seconds << " seconds\n";
+	start = std::chrono::high_resolution_clock::now();
 
 	map<string,int> genesWithNoNeighbors;
 
 	// Create a node for each member of each module
-	for(map<int,map<string,int>*>::iterator gIter=moduleGeneSet.begin();gIter!=moduleGeneSet.end();gIter++)
-	{
-		map<string,int>* moduleMembers=gIter->second;
-		for(map<string,int>::iterator mIter=moduleMembers->begin();mIter!=moduleMembers->end();mIter++)
-		{
-			int mID=varManager->getVarID(mIter->first);
-			if(mID<0)
-			{
+	for(map<int, map<string, int>*>::iterator gIter = moduleGeneSet.begin(); gIter != moduleGeneSet.end(); gIter++) {
+		map<string, int>* moduleMembers=gIter->second;
+
+		for(map<string, int>::iterator mIter = moduleMembers->begin(); mIter != moduleMembers->end(); mIter++) {
+			int mID = varManager->getVarID(mIter->first);
+			if(mID < 0) {
 				continue;
 			}
 			SlimFactor* mFactor=factorGraph->getFactorAt(mID);
 
 			// If a gene has no neighbors, we dont include it in the clustering algorithm.
-			INTINTMAP& mbvars1=mFactor->mergedMB;
-			if(mbvars1.size()==0)
-			{
-				genesWithNoNeighbors[mIter->first]=0;
+			INTINTMAP& mbvars1 = mFactor->mergedMB;
+			if(mbvars1.size() == 0) {
+				genesWithNoNeighbors[mIter->first] = 0;
 				continue;
 			}
 
 			// Create a node for this gene
 			HierarchicalClusterNode* node = hc.getNode(mIter->first);
-			if (node == nullptr)
-			{
+			if (node == nullptr) {
 				node = new HierarchicalClusterNode;
 				node->nodeName.append(mIter->first);
 				node->varID = mID;
 				hc.addNode(node);
 
 				// Add expression data on the new node
-				for(INTINTMAP_ITER eIter=tSet.begin();eIter!=tSet.end();eIter++)
-				{
-					EMAP* evidMap=evidenceManager->getEvidenceAt(eIter->first);
-					Evidence* evid=(*evidMap)[mID];
-					double v=evid->getEvidVal();
+				for(INTINTMAP_ITER eIter = tSet.begin(); eIter != tSet.end(); eIter++) {
+					EMAP* evidMap = evidenceManager->getEvidenceAt(eIter->first);
+					Evidence* evid = (*evidMap)[mID];
+					double v = evid->getEvidVal();
 					node->expr.push_back(v);
 				}
 			}
 
 			// Add weights for incoming edges onto the node
-			INTDBLMAP& regWts=mFactor->potFunc->getWeights();
-			for(INTDBLMAP_ITER bIter=regWts.begin();bIter!=regWts.end();bIter++)
-			{
-				node->attrib[bIter->first]=bIter->second;
+			INTDBLMAP& regWts = mFactor->potFunc->getWeights();
+			for(INTDBLMAP_ITER bIter = regWts.begin(); bIter != regWts.end(); bIter++) {
+				node->attrib[bIter->first] = bIter->second;
 			}
 		}
 	}
 
+	end = std::chrono::high_resolution_clock::now();
+    seconds = std::chrono::duration<double>(end - start).count();
+    std::cout << "Point 2: " << seconds << " seconds\n";
+	start = std::chrono::high_resolution_clock::now();
+
 	// Perform the new clustering
 	map<int,map<string,int>*> newModules;
 	hc.cluster(newModules, clusterThreshold, correlationDistances);
+
+	end = std::chrono::high_resolution_clock::now();
+    seconds = std::chrono::duration<double>(end - start).count();
+    std::cout << "Point 3: " << seconds << " seconds\n";
+	start = std::chrono::high_resolution_clock::now();
 
 	// Clear out any data representing the old module assignments
 	moduleGeneSet.clear();
@@ -1284,6 +1294,11 @@ MetaLearner::redefineModules()
 		delete mIter->second;
 	}
 	moduleIndegree.clear();
+
+	end = std::chrono::high_resolution_clock::now();
+    seconds = std::chrono::duration<double>(end - start).count();
+    std::cout << "Point 4: " << seconds << " seconds\n";
+	start = std::chrono::high_resolution_clock::now();
 
 	char moduleFName[1024];
 	sprintf(moduleFName,"%s/fold%d/modules.txt",outputDirName,currFold);
@@ -1333,6 +1348,11 @@ MetaLearner::redefineModules()
 	}
 	modFile.close();
 
+	end = std::chrono::high_resolution_clock::now();
+    seconds = std::chrono::duration<double>(end - start).count();
+    std::cout << "Point 5: " << seconds << " seconds\n";
+	start = std::chrono::high_resolution_clock::now();
+
 	// For any genes with no neighbors, create single gene modules
 	cout << "   Number of singleton modules: " << genesWithNoNeighbors.size() << endl;
 	for(map<string,int>::iterator gIter=genesWithNoNeighbors.begin();gIter!=genesWithNoNeighbors.end();gIter++)
@@ -1345,6 +1365,10 @@ MetaLearner::redefineModules()
 	}
 	genesWithNoNeighbors.clear();
 	cout << "   Finished redefining modules; " << moduleGeneSet.size() << " total modules" << endl;
+
+	end = std::chrono::high_resolution_clock::now();
+    seconds = std::chrono::duration<double>(end - start).count();
+    std::cout << "Point 6: " << seconds << " seconds\n";
 
 	return 0;
 }

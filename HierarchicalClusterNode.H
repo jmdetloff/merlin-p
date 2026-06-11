@@ -12,7 +12,9 @@ class HierarchicalClusterNode
 	public:
 		HierarchicalClusterNode();
 
-		unordered_map<int, double> attrib;
+		unordered_map<int, double> regWeights;
+		unordered_map<int, double> absRegWeights;
+
 		vector<double> expr;
 		HierarchicalClusterNode* left;
 		HierarchicalClusterNode* right;

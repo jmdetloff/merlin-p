@@ -633,13 +633,12 @@ MetaLearner::initEdgeSet()
 			{
 				continue;
 			}
+
+			// This is going to be a directed graph. edgeKey looks like "reg_name\tgene_name"
 			string edgeKey;
-			//This is going to be a directed graph. edgeKey looks like "reg_name\tgene_name"
 			edgeKey.append(u->getName().c_str());
 			edgeKey.append("\t");
 			edgeKey.append(v->getName().c_str());
-
-			edgeMap[edgeKey]=0; //initialize this edge to absent for the future LEARNED graph
 
 			double initPrior=getEdgePrior(uIter->first,vIter->first);
 			initPrior = 1/(1+exp(-1*initPrior));
@@ -666,7 +665,6 @@ MetaLearner::initEdgeSet()
 	int n=varSet.size();
 	int r=restrictedVarList.size();
 	int expEdgeCnt=r*(n-1);
-	// cout <<"Initialized " << edgeMap.size() << " edges. Expected " << expEdgeCnt << endl;
 
 	// Init the potentials
 	for(int f=0;f<factorGraph->getFactorCnt();f++)
@@ -853,9 +851,12 @@ MetaLearner::getNextMove(int maxNumRegs, int vID)
 		edgeKey.append(v->getName().c_str());
 
 		// If the edge already exists, no need to test adding it.
-		int edgeValue = edgeMap[edgeKey];
-		if(edgeValue == 1) {
-			continue;
+		auto regEdgeIter = edgeMap.find(regID);
+		if (regEdgeIter != edgeMap.end()) {
+			auto targetEdgeIter = regEdgeIter->second.find(vID);
+			if (targetEdgeIter != regEdgeIter->second.end() && targetEdgeIter->second == 1) {
+				continue;
+			}
 		}
 
 		double candidateEdgePrior = getEdgePrior(regID, vID);
@@ -985,11 +986,6 @@ MetaLearner::makeMove(MetaMove* nextMove, int currIteration)
 	Variable* u = varSet[nextMove->getSrcVertex()];
 	Variable* v = varSet[nextMove->getTargetVertex()];
 
-	string edgeKey;
-	edgeKey.append(u->getName().c_str());
-	edgeKey.append("\t");
-	edgeKey.append(v->getName().c_str());
-
 	SlimFactor* dFactor = factorGraph->getFactorAt(nextMove->getTargetVertex());
 
 	// Clean up the old potential
@@ -1006,37 +1002,28 @@ MetaLearner::makeMove(MetaMove* nextMove, int currIteration)
 
 	// Get or create an indegree map for this module
 	unordered_map<string, int>* currIndegree = NULL;
-	if(moduleIndegree.find(mID) == moduleIndegree.end())
-	{
+	if(moduleIndegree.find(mID) == moduleIndegree.end()) {
 		currIndegree = new unordered_map<string, int>;
 		moduleIndegree[mID] = currIndegree;
-	}
-	else
-	{
+	} else {
 		currIndegree = moduleIndegree[mID];
 	}
 
 	// Increment the count of edges from u to the module of v
-	if(currIndegree->find(u->getName()) == currIndegree->end())
-	{
+	if(currIndegree->find(u->getName()) == currIndegree->end()) {
 		(*currIndegree)[u->getName()] = 1;
-	}
-	else
-	{
+	} else {
 		(*currIndegree)[u->getName()] += 1;
 	}
 
 	// Increment the count of edges from u
-	if(regulatorModuleOutdegree.find(u->getName()) == regulatorModuleOutdegree.end())
-	{
+	if(regulatorModuleOutdegree.find(u->getName()) == regulatorModuleOutdegree.end()) {
 		regulatorModuleOutdegree[u->getName()] = 1;
-	}
-	else
-	{
+	} else {
 		regulatorModuleOutdegree[u->getName()] += 1;
 	}
 
-	edgeMap[edgeKey] = 1;
+	edgeMap[u->getID()][v->getID()] = 1;
 
 	variableStatus[v->getName()] = currIteration;
 }
@@ -1265,7 +1252,8 @@ MetaLearner::redefineModules()
 			// Add weights for incoming edges onto the node
 			unordered_map<int, double>& regWts = mFactor->potFunc->getWeights();
 			for(auto bIter = regWts.begin(); bIter != regWts.end(); bIter++) {
-				node->attrib[bIter->first] = bIter->second;
+				node->regWeights[bIter->first] = bIter->second;
+				node->absRegWeights[bIter->first] = bIter->second;
 			}
 		}
 	}

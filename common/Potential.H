@@ -25,11 +25,11 @@ class Potential
 
 		// Returns the expected value of the factor variable, given the values
 		// of the conditioning variables.
-		double getExpectation(map<int,Evidence*>*);
+		double getExpectation(unordered_map<int, Evidence*>*);
 
 		// Evaluates the conditional probability density at the provided factor
 		// variable value, given the provided values of the conditioning variables.
-		double evaluateProbabilityDensity(map<int,Evidence*>*);
+		double evaluateProbabilityDensity(unordered_map<int, Evidence*>*);
 
 	private:
 		int factorID;

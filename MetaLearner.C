@@ -1384,11 +1384,9 @@ MetaLearner::initCorrelationDistances()
 
 	vector<double> means(varCount, 0);
 
-	for (INTINTMAP_ITER iter = samples.begin(); iter != samples.end(); iter++)
-	{
+	for (INTINTMAP_ITER iter = samples.begin(); iter != samples.end(); iter++) {
 		EMAP* evidMap = evidenceManager->getEvidenceAt(iter->first);
-		for (int i = 0; i < varCount; i++)
-		{
+		for (int i = 0; i < varCount; i++) {
 			Evidence* evid=(*evidMap)[i];
 			means[i] += evid->getEvidVal();
 		}
@@ -1402,11 +1400,9 @@ MetaLearner::initCorrelationDistances()
 	vector<vector<double>> deviations(varCount, vector<double>(sampleCount, 0));
 
 	int sampleIndex = 0;
-	for (INTINTMAP_ITER iter = samples.begin(); iter != samples.end(); iter++)
-	{
+	for (INTINTMAP_ITER iter = samples.begin(); iter != samples.end(); iter++) {
 		EMAP* evidMap = evidenceManager->getEvidenceAt(iter->first);
-		for (int i = 0; i < varSet.size(); i++)
-		{
+		for (int i = 0; i < varSet.size(); i++) {
 			double deviation = (*evidMap)[i]->getEvidVal() - means[i];
 			deviations[i][sampleIndex] = deviation;
 			ssd[i] += deviation * deviation;
@@ -1418,19 +1414,16 @@ MetaLearner::initCorrelationDistances()
 
 	double threshold = sampleCount / 2.0;
 
-	for (int i = 0; i < varCount; i++)
-	{
+	for (int i = 0; i < varCount; i++) {
 		double xx = ssd[i];
 		double* dev_i = deviations[i].data();
 
-		for (int j = i; j < varCount; j++)
-		{
+		for (int j = i; j < varCount; j++) {
 			double* dev_j = deviations[j].data();
 			double xy = 0;
 			int oppRel = 0;
 
-			for(int k = 0; k < sampleCount; k++)
-			{
+			for(int k = 0; k < sampleCount; k++) {
 				double diff1 = dev_i[k];
 				double diff2 = dev_j[k];
 				double val = diff1 * diff2;
@@ -1441,8 +1434,7 @@ MetaLearner::initCorrelationDistances()
 			double yy = ssd[j];
 			double cc = abs(xy) / sqrt(xx * yy);
 
-			if(oppRel > threshold)
-			{
+			if(oppRel > threshold) {
 				cc *= -1;
 			}
 

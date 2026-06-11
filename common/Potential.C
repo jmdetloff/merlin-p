@@ -20,7 +20,7 @@ Potential::getWeights()
 }
 
 double
-Potential::getExpectation(map<int,Evidence*>* evidenceSet)
+Potential::getExpectation(unordered_map<int, Evidence*>* evidenceSet)
 {
 	double mean=0;
 	for(INTDBLMAP_ITER aIter=weights.begin();aIter!=weights.end();aIter++)
@@ -38,10 +38,9 @@ Potential::getExpectation(map<int,Evidence*>* evidenceSet)
 }
 
 double
-Potential::evaluateProbabilityDensity(map<int,Evidence*>* evidMap)
+Potential::evaluateProbabilityDensity(unordered_map<int, Evidence*>* evidMap)
 {
-	if(evidMap->find(factorID)==evidMap->end())
-	{
+	if(evidMap->find(factorID)==evidMap->end()) {
 		cerr <<"Fatal error! No variable assignment for " << factorID << endl;
 		exit(-1);
 	}

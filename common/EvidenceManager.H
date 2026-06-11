@@ -14,8 +14,8 @@ class Evidence;
 
 //EMAP stores the map of variable ids and their evidence. This corresponds
 //to one line in the datafile
-typedef map<int,Evidence*> EMAP;
-typedef map<int,Evidence*>::iterator EMAP_ITER;
+typedef unordered_map<int,Evidence*> EMAP;
+typedef unordered_map<int,Evidence*>::iterator EMAP_ITER;
 
 typedef vector<EMAP*> EVIDENCE_SET;
 

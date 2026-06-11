@@ -1402,7 +1402,7 @@ MetaLearner::initCorrelationDistances()
 	int sampleIndex = 0;
 	for (INTINTMAP_ITER iter = samples.begin(); iter != samples.end(); iter++) {
 		EMAP* evidMap = evidenceManager->getEvidenceAt(iter->first);
-		for (int i = 0; i < varSet.size(); i++) {
+		for (int i = 0; i < varCount; i++) {
 			double deviation = (*evidMap)[i]->getEvidVal() - means[i];
 			deviations[i][sampleIndex] = deviation;
 			ssd[i] += deviation * deviation;
@@ -1414,8 +1414,12 @@ MetaLearner::initCorrelationDistances()
 
 	double threshold = sampleCount / 2.0;
 
+	vector<double> invStd(varCount, 0);
 	for (int i = 0; i < varCount; i++) {
-		double xx = ssd[i];
+		invStd[i] = 1.0 / sqrt(ssd[i]);
+	}
+
+	for (int i = 0; i < varCount; i++) {
 		double* dev_i = deviations[i].data();
 
 		for (int j = i; j < varCount; j++) {
@@ -1431,8 +1435,7 @@ MetaLearner::initCorrelationDistances()
 				oppRel += (val < 0);
 			}
 
-			double yy = ssd[j];
-			double cc = abs(xy) / sqrt(xx * yy);
+			double cc = abs(xy) * invStd[i] * invStd[j];
 
 			if(oppRel > threshold) {
 				cc *= -1;

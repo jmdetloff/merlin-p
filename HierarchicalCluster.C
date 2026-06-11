@@ -70,23 +70,22 @@ HierarchicalCluster::cluster(map<int,map<string,int>*>& modules, double threshol
 	start = std::chrono::high_resolution_clock::now();
 
 	// Populate distances between the leaf nodes.
-	vector<Pair*> pairs = estimatePairwiseDist(currNodeSet, correlationDistances, threshold);
+	vector<Pair> pairs = estimatePairwiseDist(currNodeSet, correlationDistances, threshold);
 
 	end = std::chrono::high_resolution_clock::now();
 	seconds = std::chrono::duration<double>(end - start).count();
 	std::cout << "  Point C: " << seconds << " seconds\n";
 	start = std::chrono::high_resolution_clock::now();
 
-	priority_queue<Pair*, vector<Pair*>, ComparePair> pairQueue(pairs.begin(), pairs.end());
+	priority_queue<Pair, vector<Pair>, ComparePair> pairQueue(pairs.begin(), pairs.end());
 
 	vector<HierarchicalClusterNode*> internalNodes;
 
 	// Merge pairs until threshold distance is reached.
 	int nextNodeID = currNodeSet.size();
 	while(currNodeSet.size() > 1) {
-		Pair *nextPair = getNextPair(pairQueue);
-		if (nextPair == nullptr)
-		{
+		Pair nextPair;
+		if (!getNextPair(pairQueue, nextPair)) {
 			break;
 		}
 
@@ -111,25 +110,18 @@ HierarchicalCluster::cluster(map<int,map<string,int>*>& modules, double threshol
 	start = std::chrono::high_resolution_clock::now();
 
 	// Reset parent to null on all the cached leaf nodes.
-	for(map<string,HierarchicalClusterNode*>::iterator aIter=nodeSet.begin();aIter!=nodeSet.end();aIter++)
-	{
+	for(map<string, HierarchicalClusterNode*>::iterator aIter = nodeSet.begin(); aIter != nodeSet.end(); aIter++) {
 		aIter->second->parent = nullptr;
 	}
 
 	// Clean up all the data
-	for (vector<HierarchicalClusterNode*>::iterator it = internalNodes.begin(); it != internalNodes.end(); it++)
-	{
+	for (vector<HierarchicalClusterNode*>::iterator it = internalNodes.begin(); it != internalNodes.end(); it++) {
 		delete *it;
 	}
-	for (int i = 0; i < treenodecnt; i++)
-	{
+	for (int i = 0; i < treenodecnt; i++) {
 		delete [] distvalues[i];
 	}
 	delete [] distvalues;
-	for (int i = 0; i < pairs.size(); i++)
-	{
-		delete pairs[i];
-	}
 
 	end = std::chrono::high_resolution_clock::now();
 	seconds = std::chrono::duration<double>(end - start).count();
@@ -139,7 +131,7 @@ HierarchicalCluster::cluster(map<int,map<string,int>*>& modules, double threshol
 	return 0;
 }
 
-vector<HierarchicalCluster::Pair*>
+vector<HierarchicalCluster::Pair>
 HierarchicalCluster::estimatePairwiseDist(unordered_map<int, HierarchicalClusterNode*>& currNodeSet, Matrix* correlationDistances, double threshold)
 {
 	vector<double> denoms(currNodeSet.size(), 0);
@@ -153,7 +145,7 @@ HierarchicalCluster::estimatePairwiseDist(unordered_map<int, HierarchicalCluster
 		denoms[i] = denom;
 	}
 
-	vector<Pair*> pairs;
+	vector<Pair> pairs;
 
 	for (int i = 0; i < currNodeSet.size(); i++) {
 
@@ -191,10 +183,10 @@ HierarchicalCluster::estimatePairwiseDist(unordered_map<int, HierarchicalCluster
 				continue;
 			}
 
-			Pair* p = new Pair;
-			p->node1 = hcNode1;
-			p->node2 = hcNode2;
-			p->value = dist;
+			Pair p;
+			p.node1 = hcNode1;
+			p.node2 = hcNode2;
+			p.value = dist;
 			pairs.push_back(p);
 		}
 	}
@@ -202,31 +194,29 @@ HierarchicalCluster::estimatePairwiseDist(unordered_map<int, HierarchicalCluster
 	return pairs;
 }
 
-HierarchicalCluster::Pair*
-HierarchicalCluster::getNextPair(priority_queue<Pair*, vector<Pair*>, ComparePair>& pairQueue)
+bool
+HierarchicalCluster::getNextPair(priority_queue<Pair, vector<Pair>, ComparePair>& pairQueue, Pair& nextPair)
 {
 	//Keep popping until we reach a pair whose both members have not been visited
-	while(!pairQueue.empty())
-	{
-		HierarchicalCluster::Pair* pair = pairQueue.top();
-
-		if (pair->node1->parent == nullptr && pair->node2->parent == nullptr)
-		{
-			return pair;
-		}
-
+	while(!pairQueue.empty()) {
+		Pair pair = pairQueue.top();
 		pairQueue.pop();
+
+		if (pair.node1->parent == nullptr && pair.node2->parent == nullptr) {
+			nextPair = pair;
+			return true;
+		}
 	}
 
 	// There was no unvisited node, so we are done merging.
-	return nullptr;
+	return false;
 }
 
 HierarchicalClusterNode*
-HierarchicalCluster::createMergeNode(Pair *pair, unordered_map<int,HierarchicalClusterNode*>& currNodeSet, int nextNodeID)
+HierarchicalCluster::createMergeNode(Pair& pair, unordered_map<int,HierarchicalClusterNode*>& currNodeSet, int nextNodeID)
 {
-	HierarchicalClusterNode* c1=pair->node1;
-	HierarchicalClusterNode* c2=pair->node2;
+	HierarchicalClusterNode* c1=pair.node1;
+	HierarchicalClusterNode* c2=pair.node2;
 
 	// Create a new node for the merged pair
 	HierarchicalClusterNode* c12=new HierarchicalClusterNode;
@@ -246,7 +236,7 @@ HierarchicalCluster::createMergeNode(Pair *pair, unordered_map<int,HierarchicalC
 }
 
 void
-HierarchicalCluster::addMergeNode(HierarchicalClusterNode* node, unordered_map<int, HierarchicalClusterNode*>& currNodeSet, vector<Pair*>& pairs, priority_queue<Pair*, vector<Pair*>, ComparePair>& pairQueue, double threshold)
+HierarchicalCluster::addMergeNode(HierarchicalClusterNode* node, unordered_map<int, HierarchicalClusterNode*>& currNodeSet, vector<Pair>& pairs, priority_queue<Pair, vector<Pair>, ComparePair>& pairQueue, double threshold)
 {
 	HierarchicalClusterNode* c1=node->left;
 	HierarchicalClusterNode* c2=node->right;
@@ -270,15 +260,15 @@ HierarchicalCluster::addMergeNode(HierarchicalClusterNode* node, unordered_map<i
 			continue;
 		}
 
-		Pair* newPair=new Pair;
-		newPair->value=dist;
-		newPair->node1=nIter->second;
-		newPair->node2=node;
+		Pair newPair;
+		newPair.value = dist;
+		newPair.node1 = nIter->second;
+		newPair.node2 = node;
 		pairQueue.push(newPair);
 		pairs.push_back(newPair);
 	}
 
-	currNodeSet[node->id]=node;
+	currNodeSet[node->id] = node;
 }
 
 int

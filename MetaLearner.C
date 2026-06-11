@@ -834,12 +834,10 @@ MetaLearner::getNextMove(int maxNumRegs, int vID)
 	int moduleID = geneModuleID[v->getName()];
 	map<string,int>* moduleMembers = moduleGeneSet[moduleID];
 
-	double bestTargetScore = 0;
-	double bestScoreImprovement = 0;
-	Variable* bestu = NULL;
-	Potential* bestPot = NULL;
+	vector<int> candidateParents;
+	vector<double> candidatePriors;
 
-	for(map<string,int>::iterator uIter=restrictedVarList.begin();uIter!=restrictedVarList.end();uIter++) {
+	for(map<string,int>::iterator uIter = restrictedVarList.begin(); uIter != restrictedVarList.end(); uIter++) {
 		int regID = varManager->getVarID(uIter->first);
 
 		// Ensure we can find the regulator, and that it isnt the same node as the target.
@@ -868,45 +866,58 @@ MetaLearner::getNextMove(int maxNumRegs, int vID)
 		double candidateMinus = log(1 - candidateEdgeProbOld);
 		double candidatePrior = existingParentPrior + candidatePlus - candidateMinus;
 
-		parentIDs.push_back(u->getID());
+		candidateParents.push_back(regID);
+		candidatePriors.push_back(candidatePrior);
+	}
 
-		Potential* aPot = NULL;
-		double condLL = potManager->computeLL(vID, parentIDs, datasize, &aPot);
+	unordered_map<int, double> candidateScores;
+	potManager->computeLLs(vID, datasize, parentIDs, candidateParents, candidateScores);
 
-		parentIDs.pop_back();
+	double bestScore = 0;
+	double bestScoreImprovement = 0;
+	Variable* bestRegulator = NULL;
 
-		double score = condLL + candidatePrior;
-		double improvement = score - (*currPLL)[vID];
+	for (int i = 0; i < candidateParents.size(); i++) {
+		int regID = candidateParents[i];
+		double candidatePrior = candidatePriors[i];
 
-		bool betterMoveExists = (bestu != NULL) && (bestScoreImprovement >= improvement);
+		auto scoreIter = candidateScores.find(regID);
 
-		// If there is no score improvement, cleanup aPot and continue.
-		if (improvement < 0 || betterMoveExists) {
-			if (aPot != NULL) {
-				delete aPot;
-			}
+		if (scoreIter == candidateScores.end()) {
 			continue;
 		}
 
-		if(bestPot != NULL) {
-			delete bestPot;
+		double condLL = scoreIter->second;
+		double score = condLL + candidatePrior;
+		double improvement = score - (*currPLL)[vID];
+
+		bool betterMoveExists = (bestRegulator != NULL) && (bestScoreImprovement >= improvement);
+
+		// If there is no score improvement, cleanup aPot and continue.
+		if (improvement < 0 || betterMoveExists) {
+			continue;
 		}
 
-		bestu = u;
-		bestTargetScore = score;
+		bestRegulator = varSet[regID];
+		bestScore = score;
 		bestScoreImprovement = improvement;
-		bestPot = aPot;
 	}
 
 	// If we could not find a parent to add to v that would improve the score:
-	if((bestu == NULL) || (bestScoreImprovement <= 0)) {
+	if(bestRegulator == NULL || bestScoreImprovement <= 0) {
 		return nullptr;
 	}
 
+	Potential* bestPot = NULL;
+
+	parentIDs.push_back(bestRegulator->getID());
+	potManager->computeLL(vID, parentIDs, datasize, &bestPot);
+	parentIDs.pop_back();
+
 	MetaMove* nextMove = new MetaMove;
-	nextMove->setSrcVertex(bestu->getID());
+	nextMove->setSrcVertex(bestRegulator->getID());
 	nextMove->setTargetVertex(v->getID());
-	nextMove->setTargetMBScore(bestTargetScore);
+	nextMove->setTargetMBScore(bestScore);
 	nextMove->setScoreImprovement(bestScoreImprovement);
 	nextMove->setDestPot(bestPot);
 	return nextMove;

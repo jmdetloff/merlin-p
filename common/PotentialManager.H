@@ -25,6 +25,10 @@ class PotentialManager
 		// Gaussian PDF.
 		double computeLL(int factorID, vector<int>& parentIDs, int sampleSize, Potential** newPot);
 
+		void computeLLs(int factorID, int sampleSize, vector<int>& existingParents, vector<int>&candidateParents, unordered_map<int, double>&scores);
+
+		void computeLLs(int factorID, int sampleSize, vector<int>&candidateParents, unordered_map<int, double>&scores);
+
 	private:
 		gsl_matrix* ludecomp;
 		gsl_permutation* perm;

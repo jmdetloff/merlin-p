@@ -151,6 +151,153 @@ PotentialManager::createPotential(int factorID)
 	return new Potential(factorID, variance, bias, weights);
 }
 
+void
+PotentialManager::computeLLs(int factorID, int sampleSize, vector<int>&candidateParents, unordered_map<int, double>&scores) {
+
+	double variance = globalCovariances->getValue(factorID, factorID);
+
+	for (int i = 0; i < candidateParents.size(); i++) {
+		int candidateID = candidateParents[i];
+
+		// Var(C)
+		double candidateVariance = globalCovariances->getValue(candidateID, candidateID);
+
+		double factorCandidateCov = globalCovariances->getValue(factorID, candidateID);
+
+		double finalVariance = variance - factorCandidateCov * factorCandidateCov / candidateVariance;
+
+		if (finalVariance < 1e-5) {
+			finalVariance = 1e-5;
+		}
+
+		if(isnan(finalVariance) || isinf(finalVariance)) {
+			continue;
+		}
+		
+		scores[candidateID] = -0.5 * ((sampleSize - 1) + sampleSize * log(2 * PI) + sampleSize * log(finalVariance));
+	}
+}
+
+void
+PotentialManager::computeLLs(int factorID, int sampleSize, vector<int>& existingParents, vector<int>&candidateParents, unordered_map<int, double>&scores) {
+
+	if (existingParents.size() == 0) {
+		computeLLs(factorID, sampleSize, candidateParents, scores);
+		return;
+	}
+
+	double variance = globalCovariances->getValue(factorID, factorID);
+
+	int parentCount = existingParents.size();
+
+	// A : factor
+	// B : existing parents
+	// C : candidate parent
+	// Create Cov(AB) and Cov(BB)
+
+	gsl_matrix* existingParentCovariances = gsl_matrix_alloc(parentCount, parentCount);
+	gsl_vector* existingParentMarginalVariances = gsl_vector_alloc(parentCount);
+
+	for (int i = 0; i < parentCount; i++) {
+		int varAID = existingParents[i];
+		double marginalCovariance = globalCovariances->getValue(factorID, varAID);
+		gsl_vector_set(existingParentMarginalVariances, i, marginalCovariance);
+
+		for (int j = i; j < parentCount; j++) {
+			int varBID = existingParents[j];
+			double covariance = globalCovariances->getValue(varAID, varBID);
+			gsl_matrix_set(existingParentCovariances, i, j, covariance);
+			gsl_matrix_set(existingParentCovariances, j, i, covariance);
+		}
+	}
+
+	// Create Cov(BB)^-1
+
+	gsl_permutation* permutation = gsl_permutation_alloc(parentCount);
+
+	int signum=0;
+	gsl_linalg_LU_decomp(existingParentCovariances, permutation, &signum);
+
+	gsl_matrix* parentCovInverse = gsl_matrix_alloc(parentCount, parentCount);
+
+	gsl_linalg_LU_invert(existingParentCovariances, permutation, parentCovInverse);
+
+	gsl_matrix_free(existingParentCovariances);
+	gsl_permutation_free(permutation);
+
+	// Create Cov(AB) * Cov(BB)^-1
+
+	gsl_vector* prod = gsl_vector_alloc(parentCount);
+	gsl_blas_dgemv(CblasTrans, 1, parentCovInverse, existingParentMarginalVariances, 0, prod);
+
+	// Make variance hold Var(A|B) = Var(A) - Cov(AB)Var(BB)^-1 Cov(AB)
+
+	for (int i = 0; i < parentCount; i++) {
+		int vID = existingParents[i];
+		double aVal = gsl_vector_get(prod, i);
+		double bVal = gsl_vector_get(existingParentMarginalVariances, i);
+		variance -= aVal * bVal;
+	}
+
+	gsl_vector_free(existingParentMarginalVariances);
+
+	for (int i = 0; i < candidateParents.size(); i++) {
+		int candidateID = candidateParents[i];
+
+		// Var(C)
+		double candidateVariance = globalCovariances->getValue(candidateID, candidateID);
+
+		// Cov(BC)
+		gsl_vector* candidateMarginalVariances = gsl_vector_alloc(parentCount);
+
+		for (int i = 0; i < parentCount; i++) {
+			int varAID = existingParents[i];
+			double marginalCovariance = globalCovariances->getValue(candidateID, varAID);
+			gsl_vector_set(candidateMarginalVariances, i, marginalCovariance);
+		}
+
+		// Create Cov(BC) * Cov(BB)^-1
+		gsl_vector* candidateProd = gsl_vector_alloc(parentCount);
+		gsl_blas_dgemv(CblasTrans, 1, parentCovInverse, candidateMarginalVariances, 0, candidateProd);
+
+		// Calc Var(C|B) = Var(BC) - Cov(CB)Var(BB)^-1 Cov(BC)
+
+		for (int i = 0; i < parentCount; i++) {
+			int vID = existingParents[i];
+			double aVal = gsl_vector_get(candidateProd, i);
+			double bVal = gsl_vector_get(candidateMarginalVariances, i);
+			candidateVariance -= aVal * bVal;
+		}
+
+		// Cov(AC)
+		double candidateFactorCovariance = globalCovariances->getValue(candidateID, factorID);
+
+		// Cov(AB) * Var(BB)^-1 * Cov(BC)
+		double dot = 0.0;
+		gsl_blas_ddot(prod, candidateMarginalVariances, &dot);
+
+		gsl_vector_free(candidateProd);
+		gsl_vector_free(candidateMarginalVariances);
+
+		double factorAndCandidateVarianceConditionedOnParents = candidateFactorCovariance - dot;
+
+		double finalVariance = variance - factorAndCandidateVarianceConditionedOnParents * factorAndCandidateVarianceConditionedOnParents / candidateVariance;
+		
+		if(finalVariance < 1e-5) {
+			finalVariance = 1e-5;
+		}
+
+		if(isnan(finalVariance) || isinf(finalVariance)) {
+			continue;
+		}
+		
+		scores[candidateID] = -0.5 * ((sampleSize - 1) + sampleSize * log(2 * PI) + sampleSize * log(finalVariance));
+	}
+
+	gsl_matrix_free(parentCovInverse);
+	gsl_vector_free(prod);
+}
+
 double
 PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize, Potential** newPot)
 {

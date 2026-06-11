@@ -7,6 +7,7 @@
 #include <sys/timeb.h>
 #include <sys/time.h>
 #include <time.h>
+#include <chrono>
 
 #include "Error.H"
 #include "Matrix.H"
@@ -34,6 +35,8 @@ HierarchicalCluster::addNode(HierarchicalClusterNode* node)
 int
 HierarchicalCluster::cluster(map<int,map<string,int>*>& modules, double threshold, Matrix* correlationDistances)
 {
+	auto start = std::chrono::high_resolution_clock::now();
+
 	// currNodeSet holds the subset of nodes in the dendrogram that currently have no parent.
 	map<int,HierarchicalClusterNode*> currNodeSet;
 
@@ -45,22 +48,35 @@ HierarchicalCluster::cluster(map<int,map<string,int>*>& modules, double threshol
 		nIter->second->id=nextNodeIndex;
 	}
 
+	auto end = std::chrono::high_resolution_clock::now();
+	double seconds = std::chrono::duration<double>(end - start).count();
+	std::cout << "  Point A: " << seconds << " seconds\n";
+	start = std::chrono::high_resolution_clock::now();
+
 	//The total number of nodes that can be there in a hierarchical cluster is 2n-1
 	int treenodecnt = (nodeSet.size()*2) - 1;
 
 	// Instantiate default distances
 	distvalues = new double*[treenodecnt];
-	for (int i = 0; i < treenodecnt; i++)
-	{
+	for (int i = 0; i < treenodecnt; i++) {
 		distvalues[i] = new double[treenodecnt];
-		for (int j = 0; j < treenodecnt; j++)
-		{
+		for (int j = 0; j < treenodecnt; j++) {
 			distvalues[i][j] = -1000;
 		}
 	}
 
+	end = std::chrono::high_resolution_clock::now();
+	seconds = std::chrono::duration<double>(end - start).count();
+	std::cout << "  Point B: " << seconds << " seconds\n";
+	start = std::chrono::high_resolution_clock::now();
+
 	// Populate distances between the leaf nodes.
 	vector<Pair*> pairs = estimatePairwiseDist(currNodeSet, correlationDistances, threshold);
+
+	end = std::chrono::high_resolution_clock::now();
+	seconds = std::chrono::duration<double>(end - start).count();
+	std::cout << "  Point C: " << seconds << " seconds\n";
+	start = std::chrono::high_resolution_clock::now();
 
 	priority_queue<Pair*, vector<Pair*>, ComparePair> pairQueue(pairs.begin(), pairs.end());
 
@@ -83,8 +99,18 @@ HierarchicalCluster::cluster(map<int,map<string,int>*>& modules, double threshol
 		nextNodeID += 1;
 	}
 
+	end = std::chrono::high_resolution_clock::now();
+	seconds = std::chrono::duration<double>(end - start).count();
+	std::cout << "  Point D: " << seconds << " seconds\n";
+	start = std::chrono::high_resolution_clock::now();
+
 	// Populates modules with the clustering represented by currNodeSet
 	generateModules(currNodeSet, modules);
+
+	end = std::chrono::high_resolution_clock::now();
+	seconds = std::chrono::duration<double>(end - start).count();
+	std::cout << "  Point E: " << seconds << " seconds\n";
+	start = std::chrono::high_resolution_clock::now();
 
 	// Reset parent to null on all the cached leaf nodes.
 	for(map<string,HierarchicalClusterNode*>::iterator aIter=nodeSet.begin();aIter!=nodeSet.end();aIter++)
@@ -106,6 +132,11 @@ HierarchicalCluster::cluster(map<int,map<string,int>*>& modules, double threshol
 	{
 		delete pairs[i];
 	}
+
+	end = std::chrono::high_resolution_clock::now();
+	seconds = std::chrono::duration<double>(end - start).count();
+	std::cout << "  Point D: " << seconds << " seconds\n";
+	start = std::chrono::high_resolution_clock::now();
 
 	return 0;
 }

@@ -38,14 +38,13 @@ HierarchicalCluster::cluster(map<int,map<string,int>*>& modules, double threshol
 	auto start = std::chrono::high_resolution_clock::now();
 
 	// currNodeSet holds the subset of nodes in the dendrogram that currently have no parent.
-	map<int,HierarchicalClusterNode*> currNodeSet;
+	unordered_map<int,HierarchicalClusterNode*> currNodeSet;
 
 	// Load leaves into currNodeSet
-	for(map<string,HierarchicalClusterNode*>::iterator nIter=nodeSet.begin();nIter!=nodeSet.end();nIter++)
-	{
+	for(map<string,HierarchicalClusterNode*>::iterator nIter = nodeSet.begin(); nIter != nodeSet.end(); nIter++) {
 		int nextNodeIndex = currNodeSet.size();
-		currNodeSet[nextNodeIndex]=nIter->second;
-		nIter->second->id=nextNodeIndex;
+		currNodeSet[nextNodeIndex] = nIter->second;
+		nIter->second->id = nextNodeIndex;
 	}
 
 	auto end = std::chrono::high_resolution_clock::now();
@@ -84,8 +83,7 @@ HierarchicalCluster::cluster(map<int,map<string,int>*>& modules, double threshol
 
 	// Merge pairs until threshold distance is reached.
 	int nextNodeID = currNodeSet.size();
-	while(currNodeSet.size()>1)
-	{
+	while(currNodeSet.size() > 1) {
 		Pair *nextPair = getNextPair(pairQueue);
 		if (nextPair == nullptr)
 		{
@@ -142,16 +140,14 @@ HierarchicalCluster::cluster(map<int,map<string,int>*>& modules, double threshol
 }
 
 vector<HierarchicalCluster::Pair*>
-HierarchicalCluster::estimatePairwiseDist(map<int,HierarchicalClusterNode*>& currNodeSet, Matrix* correlationDistances, double threshold)
+HierarchicalCluster::estimatePairwiseDist(unordered_map<int, HierarchicalClusterNode*>& currNodeSet, Matrix* correlationDistances, double threshold)
 {
 	vector<double> denoms(currNodeSet.size(), 0);
 
-	for (int i = 0; i < currNodeSet.size(); i++)
-	{
+	for (int i = 0; i < currNodeSet.size(); i++) {
 		double denom = 0;
 		HierarchicalClusterNode* node = currNodeSet[i];
-		for(map<int,double>::iterator iter = node->attrib.begin(); iter != node->attrib.end(); iter++)
-		{
+		for(map<int, double>::iterator iter = node->attrib.begin(); iter != node->attrib.end(); iter++) {
 			denom += fabs(iter->second);
 		}
 		denoms[i] = denom;
@@ -159,31 +155,29 @@ HierarchicalCluster::estimatePairwiseDist(map<int,HierarchicalClusterNode*>& cur
 
 	vector<Pair*> pairs;
 
-	for (int i = 0; i < currNodeSet.size(); i++)
-	{
+	for (int i = 0; i < currNodeSet.size(); i++) {
+
 		HierarchicalClusterNode* hcNode1 = currNodeSet[i];
 		double den1 = denoms[i];
 
-		for(int j = i + 1; j < currNodeSet.size(); j++)
-		{
+		for(int j = i + 1; j < currNodeSet.size(); j++) {
+
 			HierarchicalClusterNode* hcNode2 = currNodeSet[j];
 			double den2 = denoms[j];
 
 			double ccdist = correlationDistances->getValue(hcNode1->varID, hcNode2->varID);
 
 			double sharedSign = 0;
-			for(map<int,double>::iterator aIter = hcNode1->attrib.begin(); aIter != hcNode1->attrib.end(); aIter++)
-			{
+			for(map<int,double>::iterator aIter = hcNode1->attrib.begin(); aIter != hcNode1->attrib.end(); aIter++) {
+
 				map<int, double>::iterator bIter = hcNode2->attrib.find(aIter->first);
-				if(bIter == hcNode2->attrib.end())
-				{
+				if(bIter == hcNode2->attrib.end()) {
 					continue;
 				}
 
 				double weight1 = aIter->second;
 				double weight2 = bIter->second;
-				if(weight1 * weight2 >= 0)
-				{
+				if(weight1 * weight2 >= 0) {
 					sharedSign += (fabs(weight1) + fabs(weight2)) * 0.5;
 				}
 			}
@@ -193,8 +187,7 @@ HierarchicalCluster::estimatePairwiseDist(map<int,HierarchicalClusterNode*>& cur
 			distvalues[i][j] = dist;
 			distvalues[j][i] = dist;
 
-			if (dist >= threshold)
-			{
+			if (dist >= threshold) {
 				continue;
 			}
 
@@ -230,7 +223,7 @@ HierarchicalCluster::getNextPair(priority_queue<Pair*, vector<Pair*>, ComparePai
 }
 
 HierarchicalClusterNode*
-HierarchicalCluster::createMergeNode(Pair *pair, map<int,HierarchicalClusterNode*>& currNodeSet, int nextNodeID)
+HierarchicalCluster::createMergeNode(Pair *pair, unordered_map<int,HierarchicalClusterNode*>& currNodeSet, int nextNodeID)
 {
 	HierarchicalClusterNode* c1=pair->node1;
 	HierarchicalClusterNode* c2=pair->node2;
@@ -253,7 +246,7 @@ HierarchicalCluster::createMergeNode(Pair *pair, map<int,HierarchicalClusterNode
 }
 
 void
-HierarchicalCluster::addMergeNode(HierarchicalClusterNode* node, map<int,HierarchicalClusterNode*>& currNodeSet, vector<Pair*>& pairs, priority_queue<Pair*, vector<Pair*>, ComparePair>& pairQueue, double threshold)
+HierarchicalCluster::addMergeNode(HierarchicalClusterNode* node, unordered_map<int, HierarchicalClusterNode*>& currNodeSet, vector<Pair*>& pairs, priority_queue<Pair*, vector<Pair*>, ComparePair>& pairQueue, double threshold)
 {
 	HierarchicalClusterNode* c1=node->left;
 	HierarchicalClusterNode* c2=node->right;
@@ -263,8 +256,8 @@ HierarchicalCluster::addMergeNode(HierarchicalClusterNode* node, map<int,Hierarc
 	double* dist_n12=distvalues[node->id];
 
 	// For every other node, set the distance to the new node and create a new pair.
-	for(map<int,HierarchicalClusterNode*>::iterator nIter=currNodeSet.begin();nIter!=currNodeSet.end();nIter++)
-	{
+	for(auto nIter = currNodeSet.begin(); nIter != currNodeSet.end(); nIter++) {
+
 		double d1=dist_n1[nIter->first];
 		double d2=dist_n2[nIter->first];
 		double dkm_rdist=((c1->size*d1) + (c2->size*d2))/((double)(c1->size + c2->size));
@@ -273,8 +266,7 @@ HierarchicalCluster::addMergeNode(HierarchicalClusterNode* node, map<int,Hierarc
 		double* dist_other=distvalues[nIter->first];
 		dist_other[node->id]=dist;
 
-		if (dist >= threshold)
-		{
+		if (dist >= threshold) {
 			continue;
 		}
 
@@ -290,11 +282,10 @@ HierarchicalCluster::addMergeNode(HierarchicalClusterNode* node, map<int,Hierarc
 }
 
 int
-HierarchicalCluster::generateModules(map<int,HierarchicalClusterNode*>& currNodeSet,map<int,map<string,int>*>& modules)
+HierarchicalCluster::generateModules(unordered_map<int, HierarchicalClusterNode*>& currNodeSet, map<int, map<string, int>*>& modules)
 {
 	int moduleCnt=modules.size();
-	for(map<int,HierarchicalClusterNode*>::iterator cIter=currNodeSet.begin();cIter!=currNodeSet.end();cIter++)
-	{
+	for(auto cIter = currNodeSet.begin(); cIter != currNodeSet.end(); cIter++) {
 		HierarchicalClusterNode* node=cIter->second;
 		map<string,int>* moduleMembers=new map<string,int>;
 		modules[moduleCnt]=moduleMembers;

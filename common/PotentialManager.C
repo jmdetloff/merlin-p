@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cstring>
 #include <math.h>
+#include <unordered_map>
 
 #include "CommonTypes.H"
 #include "Error.H"

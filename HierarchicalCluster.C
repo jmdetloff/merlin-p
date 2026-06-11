@@ -159,11 +159,19 @@ HierarchicalCluster::estimatePairwiseDist(unordered_map<int, HierarchicalCluster
 
 			double ccdist = correlationDistances->getValue(hcNode1->varID, hcNode2->varID);
 
-			double sharedSign = 0;
-			for(auto aIter = hcNode1->attrib.begin(); aIter != hcNode1->attrib.end(); aIter++) {
+			// We want to loop whichever list of weights is shortest, to minimize checking for non-existent weights.
+			unordered_map<int, double>* attrib1 = &hcNode1->attrib;
+			unordered_map<int, double>* attrib2 = &hcNode2->attrib;
+			if (attrib2->size() < attrib1->size()) {
+				attrib1 = &hcNode2->attrib;
+				attrib2 = &hcNode1->attrib;
+			}
 
-				auto bIter = hcNode2->attrib.find(aIter->first);
-				if(bIter == hcNode2->attrib.end()) {
+			double sharedSign = 0;
+			for(auto aIter = attrib1->begin(); aIter != attrib1->end(); aIter++) {
+
+				auto bIter = attrib2->find(aIter->first);
+				if(bIter == attrib2->end()) {
 					continue;
 				}
 

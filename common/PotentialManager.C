@@ -148,7 +148,7 @@ PotentialManager::createPotential(int factorID)
 	int varCount = globalMeans.size();
 	double variance = globalCovariances->getValue(factorID, factorID);
 	double bias = globalMeans[factorID];
-	INTDBLMAP weights;
+	unordered_map<int, double> weights;
 	return new Potential(factorID, variance, bias, weights);
 }
 
@@ -304,7 +304,7 @@ PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize
 {
 	double variance = globalCovariances->getValue(factorID, factorID);
 	double bias = globalMeans[factorID];
-	INTDBLMAP weights;
+	unordered_map<int, double> weights;
 
 	int parentCount = parentIDs.size();
 

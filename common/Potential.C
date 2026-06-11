@@ -5,7 +5,7 @@
 
 #include "gsl/gsl_randist.h"
 
-Potential::Potential(int factorID, double variance, double bias, INTDBLMAP& weights)
+Potential::Potential(int factorID, double variance, double bias, unordered_map<int, double>& weights)
 {
 	this->factorID = factorID;
 	this->variance = variance;
@@ -13,7 +13,7 @@ Potential::Potential(int factorID, double variance, double bias, INTDBLMAP& weig
 	this->weights = weights;
 }
 
-INTDBLMAP&
+unordered_map<int, double>&
 Potential::getWeights()
 {
 	return weights;
@@ -23,7 +23,7 @@ double
 Potential::getExpectation(unordered_map<int, Evidence*>* evidenceSet)
 {
 	double mean=0;
-	for(INTDBLMAP_ITER aIter=weights.begin();aIter!=weights.end();aIter++)
+	for(auto aIter = weights.begin(); aIter != weights.end(); aIter++)
 	{
 		if(evidenceSet->find(aIter->first)==evidenceSet->end())
 		{

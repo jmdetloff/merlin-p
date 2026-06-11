@@ -147,7 +147,7 @@ HierarchicalCluster::estimatePairwiseDist(unordered_map<int, HierarchicalCluster
 	for (int i = 0; i < currNodeSet.size(); i++) {
 		double denom = 0;
 		HierarchicalClusterNode* node = currNodeSet[i];
-		for(map<int, double>::iterator iter = node->attrib.begin(); iter != node->attrib.end(); iter++) {
+		for(auto iter = node->attrib.begin(); iter != node->attrib.end(); iter++) {
 			denom += fabs(iter->second);
 		}
 		denoms[i] = denom;
@@ -168,9 +168,9 @@ HierarchicalCluster::estimatePairwiseDist(unordered_map<int, HierarchicalCluster
 			double ccdist = correlationDistances->getValue(hcNode1->varID, hcNode2->varID);
 
 			double sharedSign = 0;
-			for(map<int,double>::iterator aIter = hcNode1->attrib.begin(); aIter != hcNode1->attrib.end(); aIter++) {
+			for(auto aIter = hcNode1->attrib.begin(); aIter != hcNode1->attrib.end(); aIter++) {
 
-				map<int, double>::iterator bIter = hcNode2->attrib.find(aIter->first);
+				auto bIter = hcNode2->attrib.find(aIter->first);
 				if(bIter == hcNode2->attrib.end()) {
 					continue;
 				}

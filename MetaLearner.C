@@ -1263,8 +1263,8 @@ MetaLearner::redefineModules()
 			}
 
 			// Add weights for incoming edges onto the node
-			INTDBLMAP& regWts = mFactor->potFunc->getWeights();
-			for(INTDBLMAP_ITER bIter = regWts.begin(); bIter != regWts.end(); bIter++) {
+			unordered_map<int, double>& regWts = mFactor->potFunc->getWeights();
+			for(auto bIter = regWts.begin(); bIter != regWts.end(); bIter++) {
 				node->attrib[bIter->first] = bIter->second;
 			}
 		}

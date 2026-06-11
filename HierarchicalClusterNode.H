@@ -1,7 +1,7 @@
 #ifndef _HIERARCHICAL_CLUSTER_NODE
 #define _HIERARCHICAL_CLUSTER_NODE
 
-#include <map>
+#include <unordered_map>
 #include <string>
 #include <vector>
 
@@ -12,7 +12,7 @@ class HierarchicalClusterNode
 	public:
 		HierarchicalClusterNode();
 
-		map<int,double> attrib;
+		unordered_map<int, double> attrib;
 		vector<double> expr;
 		HierarchicalClusterNode* left;
 		HierarchicalClusterNode* right;

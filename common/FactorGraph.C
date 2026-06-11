@@ -55,8 +55,8 @@ FactorGraph::dumpVarMB(ofstream& oFile, unordered_map<int, Variable*>& variableS
 		{
 			break;
 		}
-		INTDBLMAP& regWts=sFactor->potFunc->getWeights();
-		for(INTDBLMAP_ITER mIter=regWts.begin();mIter!=regWts.end();mIter++)
+		unordered_map<int, double>& regWts = sFactor->potFunc->getWeights();
+		for(auto mIter = regWts.begin(); mIter != regWts.end(); mIter++)
 		{
 			oFile << variableSet[mIter->first]->getName() << "\t" << variableSet[sFactor->vIds[0]]->getName() << "\t" << mIter->second << endl;
 		}

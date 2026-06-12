@@ -6,6 +6,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <chrono>
+#include <algorithm>
 
 #include "Error.H"
 #include "Variable.H"
@@ -1474,19 +1475,40 @@ MetaLearner::updateSharedParentDistances()
 
 	int updateCount = 0;
 
+	sort(updatedThisIteration.begin(), updatedThisIteration.end());
+
+	vector<bool> willVisit(varCount, false);
+	for (int k = 0; k < updatedThisIteration.size(); k++) {
+		willVisit[updatedThisIteration[k]] = true;
+	}
+
+
+	vector<double> denoms(varCount, 0);
+
+
+
 	for (auto iter = updatedThisIteration.begin(); iter != updatedThisIteration.end(); iter++) {
 		int varID = *iter;
 		SlimFactor* factorA = factorGraph->getFactorAt(varID);
 
-		double denomA = 0;
-		for(auto wIter = factorA->potFunc->getWeights().begin(); wIter != factorA->potFunc->getWeights().end(); wIter++) {
-			denomA += fabs(wIter->second);
+		double denomA = denoms[varID];
+		if (denomA == 0) {
+			for(auto wIter = factorA->potFunc->getWeights().begin(); wIter != factorA->potFunc->getWeights().end(); wIter++) {
+				denomA += fabs(wIter->second);
+			}
+			denoms[varID] = denomA;
 		}
+		
+
 
 		for (int i = 0; i < varCount; i++) {
 
 			// No need to define distance to self.
 			if (varID == i) {
+				continue;
+			}
+
+			if (willVisit[i] && i < varID) {
 				continue;
 			}
 
@@ -1500,11 +1522,14 @@ MetaLearner::updateSharedParentDistances()
 			
 			SlimFactor* factorB = factorGraph->getFactorAt(i);
 
-			double denomB = 0;
-			for(auto wIter = factorB->potFunc->getWeights().begin(); wIter != factorB->potFunc->getWeights().end(); wIter++) {
-				denomB += fabs(wIter->second);
+			double denomB = denoms[i];
+			if (denomB == 0) {
+				for(auto wIter = factorB->potFunc->getWeights().begin(); wIter != factorB->potFunc->getWeights().end(); wIter++) {
+					denomB += fabs(wIter->second);
+				}
+				denoms[i] = denomB;
 			}
-
+			
 
 			unordered_map<int, double>* regWeightsSmall = &factorA->potFunc->getWeights();
 			unordered_map<int, double>* regWeightsBig = &factorB->potFunc->getWeights();

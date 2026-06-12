@@ -38,7 +38,6 @@ MetaLearner::MetaLearner()
 	currPLL=nullptr;
 	correlationDistances=nullptr;
 	sharedParentDistances=nullptr;
-	sharedParents = nullptr;
 }
 
 MetaLearner::~MetaLearner()
@@ -446,11 +445,6 @@ MetaLearner::doCrossValidation(int foldCnt)
 
 		factorGraph = new FactorGraph(varManager);
 
-		unordered_map<int, Variable*>& varSet = varManager->getVariableSet();
-		int varCount = varSet.size();
-		sharedParents = new Matrix(varCount, varCount);
-		sharedParents->setAllValues(0);
-
 		char outputDir[1024];
 		sprintf(outputDir,"%s/fold%d",outputDirName,f);
 		char foldOutputDirCmd[1024];
@@ -614,6 +608,7 @@ MetaLearner::clearFoldSpecData()
 		factorGraph = nullptr;
 	}
 	edgeMap.clear();
+	sharedParents.clear();
 	if (currPLL != nullptr)
 	{
 		delete currPLL;
@@ -1043,8 +1038,8 @@ MetaLearner::makeMove(MetaMove* nextMove, int currIteration)
 	unordered_map<int, int> otherTargets = edgeMap[u->getID()];
 	for (auto iter = otherTargets.begin(); iter != otherTargets.end(); iter++) {
 		int targetID = iter->first;
-		sharedParents->setValue(1, targetID, v->getID());
-		sharedParents->setValue(1, v->getID(), targetID);
+		sharedParents[v->getID()][targetID] = 1;
+		sharedParents[targetID][v->getID()] = 1;
 	}
 }
 
@@ -1482,54 +1477,46 @@ MetaLearner::updateSharedParentDistances()
 		willVisit[updatedThisIteration[k]] = true;
 	}
 
-
 	vector<double> denoms(varCount, 0);
-
-
 
 	for (auto iter = updatedThisIteration.begin(); iter != updatedThisIteration.end(); iter++) {
 		int varID = *iter;
 		SlimFactor* factorA = factorGraph->getFactorAt(varID);
+		unordered_map<int, double>& weightsA = factorA->potFunc->getWeights();
 
 		double denomA = denoms[varID];
 		if (denomA == 0) {
-			for(auto wIter = factorA->potFunc->getWeights().begin(); wIter != factorA->potFunc->getWeights().end(); wIter++) {
+			for(auto wIter = weightsA.begin(); wIter != weightsA.end(); wIter++) {
 				denomA += fabs(wIter->second);
 			}
 			denoms[varID] = denomA;
 		}
-		
 
+		unordered_map<int, int>& siblingVarIDs = sharedParents[varID];
 
-		for (int i = 0; i < varCount; i++) {
+		for (auto siblingIter = siblingVarIDs.begin(); siblingIter != siblingVarIDs.end(); siblingIter++) {
+			int siblingID = siblingIter->first;
 
-			// No need to define distance to self.
-			if (varID == i) {
+			if (varID == siblingID) {
 				continue;
 			}
 
-			if (willVisit[i] && i < varID) {
-				continue;
-			}
-
-			int hasSharedParent = sharedParents->getValue(varID, i);
-			if (hasSharedParent != 1) {
+			if (willVisit[siblingID] && siblingID < varID) {
 				continue;
 			}
 
 			updateCount += 1;
 
-			
-			SlimFactor* factorB = factorGraph->getFactorAt(i);
+			SlimFactor* factorB = factorGraph->getFactorAt(siblingID);
+			unordered_map<int, double>& weightsB = factorB->potFunc->getWeights();
 
-			double denomB = denoms[i];
+			double denomB = denoms[siblingID];
 			if (denomB == 0) {
-				for(auto wIter = factorB->potFunc->getWeights().begin(); wIter != factorB->potFunc->getWeights().end(); wIter++) {
+				for(auto wIter = weightsB.begin(); wIter != weightsB.end(); wIter++) {
 					denomB += fabs(wIter->second);
 				}
-				denoms[i] = denomB;
+				denoms[siblingID] = denomB;
 			}
-			
 
 			unordered_map<int, double>* regWeightsSmall = &factorA->potFunc->getWeights();
 			unordered_map<int, double>* regWeightsBig = &factorB->potFunc->getWeights();
@@ -1556,8 +1543,8 @@ MetaLearner::updateSharedParentDistances()
 			}
 
 			double distance = 1 - sharedSign / (denomA + denomB - sharedSign);
-			sharedParentDistances->setValue(distance, varID, i);
-			sharedParentDistances->setValue(distance, i, varID);
+			sharedParentDistances->setValue(distance, varID, siblingID);
+			sharedParentDistances->setValue(distance, siblingID, varID);
 		}
 	}
 

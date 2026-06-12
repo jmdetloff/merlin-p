@@ -105,7 +105,7 @@ class MetaLearner
 	HierarchicalCluster hc;
 	Matrix* correlationDistances;
 	Matrix* sharedParentDistances;
-	Matrix* sharedParents;
+	unordered_map<int, unordered_map<int, int>> sharedParents;
 	vector<int> updatedThisIteration;
 };
 #endif

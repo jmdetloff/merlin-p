@@ -1,5 +1,6 @@
 #include <iostream>
 #include <math.h>
+#include <algorithm>
 #include "Evidence.H"
 #include "Potential.H"
 

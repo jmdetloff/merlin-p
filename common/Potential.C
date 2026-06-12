@@ -10,10 +10,21 @@ Potential::Potential(int factorID, double variance, double bias, unordered_map<i
 	this->factorID = factorID;
 	this->variance = variance;
 	this->bias = bias;
-	this->weights = weights;
+
+	this->weights.reserve(weights.size());
+
+	// Copy over the weights
+	for (auto iter = weights.begin(); iter != weights.end(); iter++) {
+		this->weights.emplace_back(iter->first, iter->second);
+	}
+
+	// Sort the weights by var ID.
+	sort(this->weights.begin(), this->weights.end(), [](const pair<int, double>& a, const pair<int, double>& b) {
+		return a.first < b.first;
+	});
 }
 
-unordered_map<int, double>&
+vector<pair<int, double>>&
 Potential::getWeights()
 {
 	return weights;

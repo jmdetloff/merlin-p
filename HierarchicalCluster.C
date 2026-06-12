@@ -104,11 +104,6 @@ HierarchicalCluster::cluster(map<int,map<string,int>*>& modules, double threshol
 	// Populates modules with the clustering represented by currNodeSet
 	generateModules(currNodeSet, modules);
 
-	end = std::chrono::high_resolution_clock::now();
-	seconds = std::chrono::duration<double>(end - start).count();
-	std::cout << "  Point E: " << seconds << " seconds\n";
-	start = std::chrono::high_resolution_clock::now();
-
 	// Reset parent to null on all the cached leaf nodes.
 	for(map<string, HierarchicalClusterNode*>::iterator aIter = nodeSet.begin(); aIter != nodeSet.end(); aIter++) {
 		aIter->second->parent = nullptr;
@@ -122,11 +117,6 @@ HierarchicalCluster::cluster(map<int,map<string,int>*>& modules, double threshol
 		delete [] distvalues[i];
 	}
 	delete [] distvalues;
-
-	end = std::chrono::high_resolution_clock::now();
-	seconds = std::chrono::duration<double>(end - start).count();
-	std::cout << "  Point D: " << seconds << " seconds\n";
-	start = std::chrono::high_resolution_clock::now();
 
 	return 0;
 }

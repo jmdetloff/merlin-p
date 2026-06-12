@@ -22,7 +22,7 @@ class Potential
 	public:
 		Potential(int factorID, double variance, double bias, unordered_map<int, double>& weights);
 
-		unordered_map<int, double>& getWeights();
+		vector<pair<int, double>>& getWeights();
 
 		// Returns the expected value of the factor variable, given the values
 		// of the conditioning variables.
@@ -36,6 +36,6 @@ class Potential
 		int factorID;
 		double variance;
 		double bias;
-		unordered_map<int, double> weights;
+		vector<pair<int, double>> weights;
 };
 #endif

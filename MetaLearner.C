@@ -1265,10 +1265,10 @@ MetaLearner::redefineModules()
 			}
 
 			// Add weights for incoming edges onto the node
-			unordered_map<int, double>& regWts = mFactor->potFunc->getWeights();
-			for(auto bIter = regWts.begin(); bIter != regWts.end(); bIter++) {
-				node->regWeights[bIter->first] = bIter->second;
-			}
+			// unordered_map<int, double>& regWts = mFactor->potFunc->getWeights();
+			// for(auto bIter = regWts.begin(); bIter != regWts.end(); bIter++) {
+				// node->regWeights[bIter->first] = bIter->second;
+			// }
 		}
 	}
 
@@ -1482,12 +1482,12 @@ MetaLearner::updateSharedParentDistances()
 	for (auto iter = updatedThisIteration.begin(); iter != updatedThisIteration.end(); iter++) {
 		int varID = *iter;
 		SlimFactor* factorA = factorGraph->getFactorAt(varID);
-		unordered_map<int, double>& weightsA = factorA->potFunc->getWeights();
+		vector<pair<int, double>>& weightsA = factorA->potFunc->getWeights();
 
 		double denomA = denoms[varID];
 		if (denomA == 0) {
-			for(auto wIter = weightsA.begin(); wIter != weightsA.end(); wIter++) {
-				denomA += fabs(wIter->second);
+			for (const auto& weight : weightsA) {
+				denomA += fabs(weight.second);
 			}
 			denoms[varID] = denomA;
 		}
@@ -1508,37 +1508,33 @@ MetaLearner::updateSharedParentDistances()
 			updateCount += 1;
 
 			SlimFactor* factorB = factorGraph->getFactorAt(siblingID);
-			unordered_map<int, double>& weightsB = factorB->potFunc->getWeights();
+			vector<pair<int, double>>& weightsB = factorB->potFunc->getWeights();
 
 			double denomB = denoms[siblingID];
 			if (denomB == 0) {
-				for(auto wIter = weightsB.begin(); wIter != weightsB.end(); wIter++) {
-					denomB += fabs(wIter->second);
+				for (const auto& weight : weightsB) {
+					denomB += fabs(weight.second);
 				}
 				denoms[siblingID] = denomB;
 			}
 
-			unordered_map<int, double>* regWeightsSmall = &factorA->potFunc->getWeights();
-			unordered_map<int, double>* regWeightsBig = &factorB->potFunc->getWeights();
-
-			// We want to loop whichever list of weights is shortest, to minimize checking for non-existent weights.
-			if (regWeightsBig->size() < regWeightsSmall->size()) {
-				regWeightsSmall = &factorB->potFunc->getWeights();
-				regWeightsBig = &factorA->potFunc->getWeights();
-			}
-
+			auto itA = weightsA.begin();
+			auto itB = weightsB.begin();
 			double sharedSign = 0;
-			for(auto aIter = regWeightsSmall->begin(); aIter != regWeightsSmall->end(); aIter++) {
 
-				auto bIter = regWeightsBig->find(aIter->first);
-				if(bIter == regWeightsBig->end()) {
-					continue;
-				}
-
-				double weight1 = aIter->second;
-				double weight2 = bIter->second;
-				if(weight1 * weight2 >= 0) {
-					sharedSign += (fabs(weight1) + fabs(weight2)) * 0.5;
+			while (itA != weightsA.end() && itB != weightsB.end()) {
+				if (itA->first == itB->first) {
+					double weight1 = itA->second;
+					double weight2 = itB->second;
+					if ((weight1 >= 0.0) == (weight2 >= 0.0)) {
+						sharedSign += (fabs(weight1) + fabs(weight2)) * 0.5;
+					}
+					++itA;
+					++itB;
+				} else if (itA->first < itB->first) {
+					++itA;
+				} else {
+					++itB;
 				}
 			}
 

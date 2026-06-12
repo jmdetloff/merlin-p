@@ -33,7 +33,7 @@ HierarchicalCluster::addNode(HierarchicalClusterNode* node)
 }
 
 int
-HierarchicalCluster::cluster(map<int,map<string,int>*>& modules, double threshold, Matrix* correlationDistances)
+HierarchicalCluster::cluster(map<int,map<string,int>*>& modules, double threshold, Matrix* correlationDistances, Matrix* sharedParentDistances)
 {
 	auto start = std::chrono::high_resolution_clock::now();
 
@@ -70,7 +70,7 @@ HierarchicalCluster::cluster(map<int,map<string,int>*>& modules, double threshol
 	start = std::chrono::high_resolution_clock::now();
 
 	// Populate distances between the leaf nodes.
-	vector<Pair> pairs = estimatePairwiseDist(currNodeSet, correlationDistances, threshold);
+	vector<Pair> pairs = estimatePairwiseDist(currNodeSet, correlationDistances, sharedParentDistances, threshold);
 
 	end = std::chrono::high_resolution_clock::now();
 	seconds = std::chrono::duration<double>(end - start).count();
@@ -132,7 +132,7 @@ HierarchicalCluster::cluster(map<int,map<string,int>*>& modules, double threshol
 }
 
 vector<HierarchicalCluster::Pair>
-HierarchicalCluster::estimatePairwiseDist(unordered_map<int, HierarchicalClusterNode*>& currNodeSet, Matrix* correlationDistances, double threshold)
+HierarchicalCluster::estimatePairwiseDist(unordered_map<int, HierarchicalClusterNode*>& currNodeSet, Matrix* correlationDistances, Matrix* sharedParentDistances, double threshold)
 {
 	vector<HierarchicalClusterNode*> allNodes(currNodeSet.size());
 
@@ -140,56 +140,57 @@ HierarchicalCluster::estimatePairwiseDist(unordered_map<int, HierarchicalCluster
 		allNodes[iter->first] = iter->second;
 	}
 
+	// vector<double> denoms(currNodeSet.size(), 0);
 
-	vector<double> denoms(currNodeSet.size(), 0);
-
-	for (int i = 0; i < allNodes.size(); i++) {
-		double denom = 0;
-		HierarchicalClusterNode* node = allNodes[i];
-		for(auto iter = node->regWeights.begin(); iter != node->regWeights.end(); iter++) {
-			denom += fabs(iter->second);
-		}
-		denoms[i] = denom;
-	}
+	// for (int i = 0; i < allNodes.size(); i++) {
+	// 	double denom = 0;
+	// 	HierarchicalClusterNode* node = allNodes[i];
+	// 	for(auto iter = node->regWeights.begin(); iter != node->regWeights.end(); iter++) {
+	// 		denom += fabs(iter->second);
+	// 	}
+	// 	denoms[i] = denom;
+	// }
 
 	vector<Pair> pairs;
 
 	for (int i = 0; i < allNodes.size(); i++) {
 
 		HierarchicalClusterNode* hcNode1 = allNodes[i];
-		double den1 = denoms[i];
+		// double den1 = denoms[i];
 
 		for(int j = i + 1; j < allNodes.size(); j++) {
 
 			HierarchicalClusterNode* hcNode2 = allNodes[j];
-			double den2 = denoms[j];
+			// double den2 = denoms[j];
 
 			double ccdist = correlationDistances->getValue(hcNode1->varID, hcNode2->varID);
 
 			// We want to loop whichever list of weights is shortest, to minimize checking for non-existent weights.
-			unordered_map<int, double>* regWeightsSmall = &hcNode1->regWeights;
-			unordered_map<int, double>* regWeightsBig = &hcNode2->regWeights;
-			if (regWeightsBig->size() < regWeightsSmall->size()) {
-				regWeightsSmall = &hcNode2->regWeights;
-				regWeightsBig = &hcNode1->regWeights;
-			}
+			// unordered_map<int, double>* regWeightsSmall = &hcNode1->regWeights;
+			// unordered_map<int, double>* regWeightsBig = &hcNode2->regWeights;
+			// if (regWeightsBig->size() < regWeightsSmall->size()) {
+			// 	regWeightsSmall = &hcNode2->regWeights;
+			// 	regWeightsBig = &hcNode1->regWeights;
+			// }
 
-			double sharedSign = 0;
-			for(auto aIter = regWeightsSmall->begin(); aIter != regWeightsSmall->end(); aIter++) {
+			// double sharedSign = 0;
+			// for(auto aIter = regWeightsSmall->begin(); aIter != regWeightsSmall->end(); aIter++) {
 
-				auto bIter = regWeightsBig->find(aIter->first);
-				if(bIter == regWeightsBig->end()) {
-					continue;
-				}
+			// 	auto bIter = regWeightsBig->find(aIter->first);
+			// 	if(bIter == regWeightsBig->end()) {
+			// 		continue;
+			// 	}
 
-				double weight1 = aIter->second;
-				double weight2 = bIter->second;
-				if(weight1 * weight2 >= 0) {
-					sharedSign += (hcNode1->absRegWeights[aIter->first] + hcNode2->absRegWeights[aIter->first]) * 0.5;
-				}
-			}
+			// 	double weight1 = aIter->second;
+			// 	double weight2 = bIter->second;
+			// 	if(weight1 * weight2 >= 0) {
+			// 		sharedSign += (fabs(weight1) + fabs(weight2)) * 0.5;
+			// 	}
+			// }
 
-			double rdist = 1 - sharedSign / (den1 + den2 - sharedSign);
+			// double rdist = 1 - sharedSign / (den1 + den2 - sharedSign);
+			double rdist = sharedParentDistances->getValue(hcNode1->varID, hcNode2->varID);
+
 			double dist = (ccdist + rdist) / 2;
 			distvalues[i][j] = dist;
 			distvalues[j][i] = dist;

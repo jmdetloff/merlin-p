@@ -16,8 +16,10 @@ class HierarchicalCluster
 {
 	public:
 		HierarchicalClusterNode* getNode(string nodeName);
+
 		void addNode(HierarchicalClusterNode* node);
-		int cluster(map<int,map<string,int>*>& modules, double threshold, Matrix* correlationDistances);
+
+		int cluster(map<int, map<string, int>*>& modules, double threshold, Matrix* correlationDistances, Matrix* sharedParentDistances);
 
 	private:
 		struct Pair
@@ -36,7 +38,7 @@ class HierarchicalCluster
 			}
 		};
 
-		vector<Pair> estimatePairwiseDist(unordered_map<int,HierarchicalClusterNode*>& currNodeSet, Matrix* correlation, double threshold);
+		vector<Pair> estimatePairwiseDist(unordered_map<int,HierarchicalClusterNode*>& currNodeSet, Matrix* correlation, Matrix* sharedParentDistances, double threshold);
 		void addMergeNode(HierarchicalClusterNode* node, unordered_map<int,HierarchicalClusterNode*>& currNodeSet, vector<Pair>& pairs, priority_queue<Pair, vector<Pair>, ComparePair>& pairQueue, double threshold);
 
 		static HierarchicalClusterNode* createMergeNode(Pair& pair, unordered_map<int,HierarchicalClusterNode*>& currNodeSet, int nextNodeID);

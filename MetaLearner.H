@@ -68,7 +68,8 @@ class MetaLearner
 	double getModuleContribLogistic(string& tgtName, string& tfName);
 	int initPhysicalDegree();
 	int getEnrichedTFs(map<string,int>& tfSet,map<string,int>* genes,map<string,map<string,double>*>& edgeSet);
-	void initCorrelationDistances();
+	void initDistances();
+	void updateSharedParentDistances();
 
 	FactorGraph* factorGraph;
 	PotentialManager* potManager;
@@ -103,5 +104,8 @@ class MetaLearner
 	int specificFold;
 	HierarchicalCluster hc;
 	Matrix* correlationDistances;
+	Matrix* sharedParentDistances;
+	Matrix* sharedParents;
+	vector<int> updatedThisIteration;
 };
 #endif

@@ -36,6 +36,8 @@ MetaLearner::MetaLearner()
 	factorGraph=nullptr;
 	currPLL=nullptr;
 	correlationDistances=nullptr;
+	sharedParentDistances=nullptr;
+	sharedParents = nullptr;
 }
 
 MetaLearner::~MetaLearner()
@@ -443,6 +445,11 @@ MetaLearner::doCrossValidation(int foldCnt)
 
 		factorGraph = new FactorGraph(varManager);
 
+		unordered_map<int, Variable*>& varSet = varManager->getVariableSet();
+		int varCount = varSet.size();
+		sharedParents = new Matrix(varCount, varCount);
+		sharedParents->setAllValues(0);
+
 		char outputDir[1024];
 		sprintf(outputDir,"%s/fold%d",outputDirName,f);
 		char foldOutputDirCmd[1024];
@@ -486,11 +493,13 @@ MetaLearner::start(int f)
 
 	int iter=0;
 	bool notConverged=true;
-	while(notConverged && iter<50)
-	{
+	while(notConverged && iter < 50) {
 		cout << "Beginning regulator identification of iter " << iter << endl;
-		int subiter=0;
-		double scorePremodule=currGlobalScore;
+
+		updatedThisIteration.clear();
+
+		int subiter = 0;
+		double scorePremodule = currGlobalScore;
 		while(subiter<varSet.size())
 		{
 			int vID=subiter;
@@ -1026,6 +1035,16 @@ MetaLearner::makeMove(MetaMove* nextMove, int currIteration)
 	edgeMap[u->getID()][v->getID()] = 1;
 
 	variableStatus[v->getName()] = currIteration;
+
+	updatedThisIteration.push_back(v->getID());
+
+	// Mark all other targets of u as sharing a parent with v.
+	unordered_map<int, int> otherTargets = edgeMap[u->getID()];
+	for (auto iter = otherTargets.begin(); iter != otherTargets.end(); iter++) {
+		int targetID = iter->first;
+		sharedParents->setValue(1, targetID, v->getID());
+		sharedParents->setValue(1, v->getID(), targetID);
+	}
 }
 
 int
@@ -1204,7 +1223,7 @@ MetaLearner::redefineModules()
 	INTINTMAP& tSet=evidenceManager->getTrainingSet();
 
 	if (correlationDistances == nullptr) {
-		initCorrelationDistances();
+		initDistances();
 	}
 
 	auto end = std::chrono::high_resolution_clock::now();
@@ -1253,7 +1272,6 @@ MetaLearner::redefineModules()
 			unordered_map<int, double>& regWts = mFactor->potFunc->getWeights();
 			for(auto bIter = regWts.begin(); bIter != regWts.end(); bIter++) {
 				node->regWeights[bIter->first] = bIter->second;
-				node->absRegWeights[bIter->first] = bIter->second;
 			}
 		}
 	}
@@ -1263,9 +1281,16 @@ MetaLearner::redefineModules()
     std::cout << "Point 2: " << seconds << " seconds\n";
 	start = std::chrono::high_resolution_clock::now();
 
+	updateSharedParentDistances();
+
+	end = std::chrono::high_resolution_clock::now();
+    seconds = std::chrono::duration<double>(end - start).count();
+    std::cout << "Point 2.5: " << seconds << " seconds\n";
+	start = std::chrono::high_resolution_clock::now();
+
 	// Perform the new clustering
 	map<int,map<string,int>*> newModules;
-	hc.cluster(newModules, clusterThreshold, correlationDistances);
+	hc.cluster(newModules, clusterThreshold, correlationDistances, sharedParentDistances);
 
 	end = std::chrono::high_resolution_clock::now();
     seconds = std::chrono::duration<double>(end - start).count();
@@ -1362,7 +1387,7 @@ MetaLearner::redefineModules()
 }
 
 void
-MetaLearner::initCorrelationDistances()
+MetaLearner::initDistances()
 {
 	INTINTMAP& samples = evidenceManager->getTrainingSet();
 	unordered_map<int, Variable*>& varSet = varManager->getVariableSet();
@@ -1435,4 +1460,81 @@ MetaLearner::initCorrelationDistances()
 			correlationDistances->setValue(cc, j, i);
 		}
 	}
+
+	// Initially we have no edges, so no nodes share a parent, and all distances are 1.
+	sharedParentDistances = new Matrix(varCount, varCount);
+	sharedParentDistances->setAllValues(1);
+}
+
+void
+MetaLearner::updateSharedParentDistances()
+{
+	unordered_map<int, Variable*>& varSet = varManager->getVariableSet();
+	int varCount = varSet.size();
+
+	int updateCount = 0;
+
+	for (auto iter = updatedThisIteration.begin(); iter != updatedThisIteration.end(); iter++) {
+		int varID = *iter;
+		SlimFactor* factorA = factorGraph->getFactorAt(varID);
+
+		double denomA = 0;
+		for(auto wIter = factorA->potFunc->getWeights().begin(); wIter != factorA->potFunc->getWeights().end(); wIter++) {
+			denomA += fabs(wIter->second);
+		}
+
+		for (int i = 0; i < varCount; i++) {
+
+			// No need to define distance to self.
+			if (varID == i) {
+				continue;
+			}
+
+			int hasSharedParent = sharedParents->getValue(varID, i);
+			if (hasSharedParent != 1) {
+				continue;
+			}
+
+			updateCount += 1;
+
+			
+			SlimFactor* factorB = factorGraph->getFactorAt(i);
+
+			double denomB = 0;
+			for(auto wIter = factorB->potFunc->getWeights().begin(); wIter != factorB->potFunc->getWeights().end(); wIter++) {
+				denomB += fabs(wIter->second);
+			}
+
+
+			unordered_map<int, double>* regWeightsSmall = &factorA->potFunc->getWeights();
+			unordered_map<int, double>* regWeightsBig = &factorB->potFunc->getWeights();
+
+			// We want to loop whichever list of weights is shortest, to minimize checking for non-existent weights.
+			if (regWeightsBig->size() < regWeightsSmall->size()) {
+				regWeightsSmall = &factorB->potFunc->getWeights();
+				regWeightsBig = &factorA->potFunc->getWeights();
+			}
+
+			double sharedSign = 0;
+			for(auto aIter = regWeightsSmall->begin(); aIter != regWeightsSmall->end(); aIter++) {
+
+				auto bIter = regWeightsBig->find(aIter->first);
+				if(bIter == regWeightsBig->end()) {
+					continue;
+				}
+
+				double weight1 = aIter->second;
+				double weight2 = bIter->second;
+				if(weight1 * weight2 >= 0) {
+					sharedSign += (fabs(weight1) + fabs(weight2)) * 0.5;
+				}
+			}
+
+			double distance = 1 - sharedSign / (denomA + denomB - sharedSign);
+			sharedParentDistances->setValue(distance, varID, i);
+			sharedParentDistances->setValue(distance, i, varID);
+		}
+	}
+
+	std::cout << "Number of distance updates: " << updateCount << std::endl;
 }

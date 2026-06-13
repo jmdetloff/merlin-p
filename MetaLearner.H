@@ -66,8 +66,8 @@ class MetaLearner
 	int setPriorGraph(const char* aFName, map<string,map<string,double>*>& priorGraph);
 	int redefineModules();
 	double getModuleContribLogistic(string& tgtName, string& tfName);
-	int initPhysicalDegree();
-	int getEnrichedTFs(map<string,int>& tfSet,map<string,int>* genes,map<string,map<string,double>*>& edgeSet);
+	void initPhysicalDegree();
+	void getEnrichedTFs(map<string, int>& tfSet, map<string, int>* genes, map<string, map<string, double>*>& edgeSet);
 	void initDistances();
 	void updateSharedParentDistances();
 

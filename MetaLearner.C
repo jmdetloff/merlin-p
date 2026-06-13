@@ -1055,120 +1055,117 @@ MetaLearner::dumpAllGraphs(int maxNumRegs,int foldid,int iter)
 	return 0;
 }
 
-int
+void
 MetaLearner::initPhysicalDegree()
 {
-	for(map<int,map<string,int>*>::iterator mIter=moduleGeneSet.begin();mIter!=moduleGeneSet.end();mIter++)
-	{
-		map<string,map<string,int>*> innet;
-		map<string,int>* geneSet=mIter->second;
-		for(map<string,map<string,map<string,double>*>*>::iterator gpIter=priorgraphmap.begin();gpIter!=priorgraphmap.end();gpIter++)
-		{
-			map<string,int>enrichedTFs;
-			map<string,map<string,double>*>* priorgraph = gpIter->second;
-			getEnrichedTFs(enrichedTFs,geneSet,*priorgraph);
-			for(map<string,int>::iterator tfIter=enrichedTFs.begin();tfIter!=enrichedTFs.end();tfIter++)
-			{
-				map<string,double>* motiftgts=(*priorgraph)[tfIter->first];
-				map<string,int>* ttgts;
-				if (innet.find(tfIter->first) == innet.end())
-				{
-					ttgts = new map<string,int>();
-					innet[tfIter->first] = ttgts;
-				}
-				else
-				{
-					ttgts = innet[tfIter->first];
-				}
-				for(map<string,double>::iterator gIter=motiftgts->begin();gIter!=motiftgts->end();gIter++)
-				{
-					if(geneSet->find(gIter->first)==geneSet->end())
-					{
+	for(map<int, map<string, int>*>::iterator mIter = moduleGeneSet.begin(); mIter != moduleGeneSet.end(); mIter++) {
+
+		int moduleID = mIter->first;
+		map<string, int>* moduleGenes = mIter->second;
+
+		// Collect the prior edges from enriched TFs to genes in this module, from all prior graphs.
+		unordered_map<string, vector<string>> priorEdges;
+
+		for(map<string, map<string, map<string, double>*>*>::iterator gpIter = priorgraphmap.begin(); gpIter != priorgraphmap.end(); gpIter++) {
+
+			map<string, map<string, double>*>* priorgraph = gpIter->second;
+
+			map<string, int>enrichedTFs;
+			getEnrichedTFs(enrichedTFs, moduleGenes, *priorgraph);
+
+			for(map<string, int>::iterator tfIter = enrichedTFs.begin(); tfIter != enrichedTFs.end(); tfIter++) {
+				
+				map<string, double>* motiftgts = (*priorgraph)[tfIter->first];
+				for(map<string, double>::iterator gIter = motiftgts->begin(); gIter != motiftgts->end(); gIter++) {
+					if(moduleGenes->find(gIter->first) == moduleGenes->end()) {
 						continue;
 					}
-					(*ttgts)[gIter->first] = 0;
+					priorEdges[tfIter->first].push_back(gIter->first);
 				}
 			}
 		}
 
+		// Save the count of incoming edges per TF.
 		unordered_map<string, int>* indegree = NULL;
-		for (map<string,map<string,int>*>::iterator tItr=innet.begin();tItr!=innet.end();tItr++)
-		{
-			string tf = tItr->first;
-			map<string,int>* ttgts = tItr->second;
-			if (ttgts->size() == 0)
-			{
+
+		for (auto tItr = priorEdges.begin(); tItr != priorEdges.end(); tItr++) {
+			string regID = tItr->first;
+			int targetCount = tItr->second.size();
+			if (targetCount == 0) {
 				continue;
 			}
-			if (indegree == NULL)
-			{
+			if (indegree == NULL) {
 				indegree = new unordered_map<string, int>;
 			}
-			(*indegree)[tf] = ttgts->size();
+			(*indegree)[regID] = targetCount;
 		}
 
-		if(indegree != NULL)
-		{
-			moduleIndegree[mIter->first] = indegree;
-			cout << "Module " << mIter->first << ": " << geneSet->size() << " genes, " << indegree->size() << " enriched TFs" << endl;
-			for(auto dIter = indegree->begin(); dIter != indegree->end(); dIter++)
-			{
-				cout << " Enriched TF " << dIter->first << ": " << dIter->second << " target genes in this module across prior networks" <<endl;
-				if(regulatorModuleOutdegree.find(dIter->first)==regulatorModuleOutdegree.end())
-				{
-					regulatorModuleOutdegree[dIter->first]=dIter->second;
-				}
-				else
-				{
-					regulatorModuleOutdegree[dIter->first]=regulatorModuleOutdegree[dIter->first]+dIter->second;
-				}
-			}
-		}
-	}
-	return 0;
-}
-
-int
-MetaLearner::getEnrichedTFs(map<string,int>& tfSet,map<string,int>* genes,map<string,map<string,double>*>& edgeSet)
-{
-	unordered_map<int, Variable*>& varSet = varManager->getVariableSet();
-	int total = varSet.size();
-	int k=genes->size();
-	HyperGeomPval hgp;
-	for(map<string,map<string,double>*>::iterator fIter=edgeSet.begin();fIter!=edgeSet.end();fIter++)
-	{
-		int uID=varManager->getVarID(fIter->first);
-		if(uID<0)
-		{
+		if(indegree == NULL) {
 			continue;
 		}
-		map<string,double>* tgtSet=fIter->second;
-		//int n=tgtSet->size();
-		int n=0;
-		int hit=0;
-		for(map<string,double>::iterator gIter=tgtSet->begin();gIter!=tgtSet->end();gIter++)
-		{
-			int vID=varManager->getVarID(gIter->first);
-            if(vID<0)
-            {
-                continue;
-            }
-            n++;
-			//if(tgtSet->find(gIter->first)==tgtSet->end())
-            if(genes->find(gIter->first)==genes->end())
-			{
-				continue;
+
+		moduleIndegree[mIter->first] = indegree;
+		cout << "Module " << moduleID << ": " << moduleGenes->size() << " genes, " << indegree->size() << " enriched TFs" << endl;
+
+		// Increment the total count of outgoing edges for each TF
+
+		for(auto dIter = indegree->begin(); dIter != indegree->end(); dIter++) {
+			cout << " Enriched TF " << dIter->first << ": " << dIter->second << " target genes in this module across prior networks" <<endl;
+			if(regulatorModuleOutdegree.find(dIter->first) == regulatorModuleOutdegree.end()) {
+				regulatorModuleOutdegree[dIter->first] = dIter->second;
+			} else {
+				regulatorModuleOutdegree[dIter->first] = regulatorModuleOutdegree[dIter->first] + dIter->second;
 			}
-			hit++;
-		}
-		double enpval=hgp.getOverRepPval(k,hit,n,total-n);
-		if(enpval<0.05 && hit>4)
-		//if(hit>0)
-		{
-			tfSet[fIter->first]=hit;
 		}
 	}
-	return 0;
+}
+
+void
+MetaLearner::getEnrichedTFs(map<string, int>& tfSet, map<string, int>* moduleGenes, map<string, map<string, double>*>& edgeSet)
+{
+	// A tf is enriched for a module, if it has at least 4 targets within that module, and
+	// more module members than expected are targets of the tf.
+
+	// We require 4 in-module targets in order for a tf to be enriched. If there aren't 4 total
+	// module genes, then no tf can be enriched.
+	if (moduleGenes->size() < 4) {
+		return;
+	}
+
+	unordered_map<int, Variable*>& varSet = varManager->getVariableSet();
+	int varCount = varSet.size();
+	int moduleVarCount = moduleGenes->size();
+
+	HyperGeomPval hgp;
+	for(map<string, map<string, double>*>::iterator fIter = edgeSet.begin(); fIter != edgeSet.end(); fIter++) {
+		int uID = varManager->getVarID(fIter->first);
+		if(uID < 0) {
+			continue;
+		}
+
+		map<string,double>* tgtSet = fIter->second;
+
+		int targetsCount = 0;
+		int targetsInModuleCount = 0;
+
+		for(map<string, double>::iterator gIter = tgtSet->begin(); gIter != tgtSet->end(); gIter++) {
+			int vID = varManager->getVarID(gIter->first);
+            if(vID < 0) {
+                continue;
+            }
+
+            targetsCount++;
+			
+            if(moduleGenes->find(gIter->first) != moduleGenes->end()) {
+				targetsInModuleCount++;
+			}
+		}
+
+		double enpval = hgp.getOverRepPval(moduleVarCount, targetsInModuleCount, targetsCount, varCount - targetsCount);
+		if (enpval < 0.05 && targetsInModuleCount > 4) {
+			tfSet[fIter->first] = targetsInModuleCount;
+		}
+	}
 }
 
 double

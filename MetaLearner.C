@@ -520,26 +520,21 @@ MetaLearner::start(int f)
 			}
 
 			auto end = std::chrono::high_resolution_clock::now();
-
 			double seconds = std::chrono::duration<double>(end - start).count();
 			std::cout << "Get move duration: " << seconds << " seconds\n";
-
 			start = std::chrono::high_resolution_clock::now();
 
 			makeMove(nextMove, iter);
 			delete nextMove;
 
 			end = std::chrono::high_resolution_clock::now();
-
 			seconds = std::chrono::duration<double>(end - start).count();
 			std::cout << "Make move duration: " << seconds << " seconds\n";
-
 			start = std::chrono::high_resolution_clock::now();
 
 			currGlobalScore=getPLLScore();
 
 			end = std::chrono::high_resolution_clock::now();
-
 			seconds = std::chrono::duration<double>(end - start).count();
 			std::cout << "Update score duration: " << seconds << " seconds\n";
 
@@ -849,11 +844,6 @@ MetaLearner::getNextMove(int maxNumRegs, int vID)
 		}
 
 		Variable* u = varSet[regID];
-
-		string edgeKey;
-		edgeKey.append(u->getName().c_str());
-		edgeKey.append("\t");
-		edgeKey.append(v->getName().c_str());
 
 		// If the edge already exists, no need to test adding it.
 		auto regEdgeIter = edgeMap.find(regID);

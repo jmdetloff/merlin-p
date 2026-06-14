@@ -789,11 +789,11 @@ MetaLearner::getNextMove(int maxNumRegs, int vID, MetaMove& outMove)
 	int datasize = tSet->size();
 
 	int moduleID = geneModuleID[v->getName()];
-	map<string,int>* moduleMembers = moduleGeneSet[moduleID];
+	map<string, int>* moduleMembers = moduleGeneSet[moduleID];
 
+	// Collect all the candidate parents, and the edge priors for each of them.
 	vector<int> candidateParents;
 	vector<double> candidatePriors;
-
 	for(map<string,int>::iterator uIter = restrictedVarList.begin(); uIter != restrictedVarList.end(); uIter++) {
 		int regID = varManager->getVarID(uIter->first);
 
@@ -825,6 +825,7 @@ MetaLearner::getNextMove(int maxNumRegs, int vID, MetaMove& outMove)
 		candidatePriors.push_back(candidatePrior);
 	}
 
+	// Collect the data likelihood for each candidate parent.
 	unordered_map<int, double> candidateScores;
 	potManager->computeLLs(vID, datasize, parentIDs, candidateParents, candidateScores);
 
@@ -832,12 +833,12 @@ MetaLearner::getNextMove(int maxNumRegs, int vID, MetaMove& outMove)
 	double bestScoreImprovement = 0;
 	Variable* bestRegulator = NULL;
 
+	// Select the best scoring candidate parent.
 	for (int i = 0; i < candidateParents.size(); i++) {
 		int regID = candidateParents[i];
 		double candidatePrior = candidatePriors[i];
 
 		auto scoreIter = candidateScores.find(regID);
-
 		if (scoreIter == candidateScores.end()) {
 			continue;
 		}
@@ -863,17 +864,15 @@ MetaLearner::getNextMove(int maxNumRegs, int vID, MetaMove& outMove)
 		return false;
 	}
 
-	Potential* bestPot = NULL;
-
 	parentIDs.push_back(bestRegulator->getID());
-	potManager->computeLL(vID, parentIDs, datasize, &bestPot);
-	parentIDs.pop_back();
+
+	Potential* potential = potManager->createPotential(vID, parentIDs);
 
 	outMove.setSrcVertex(bestRegulator->getID());
 	outMove.setTargetVertex(v->getID());
 	outMove.setTargetMBScore(bestScore);
 	outMove.setScoreImprovement(bestScoreImprovement);
-	outMove.setDestPot(bestPot);
+	outMove.setDestPot(potential);
 
 	return true;
 }

@@ -12,32 +12,19 @@
 
 PotentialManager::PotentialManager()
 {
-	ludecomp=NULL;
-	perm=NULL;
-	globalCovariances=nullptr;
+	globalCovariances = nullptr;
 }
 
 PotentialManager::~PotentialManager()
 {
-	if(ludecomp!=NULL)
-	{
-		gsl_matrix_free(ludecomp);
-	}
-	if(perm!=NULL)
-	{
-		gsl_permutation_free(perm);
-	}
-	if(globalCovariances!=nullptr)
-	{
+	if (globalCovariances != nullptr) {
 		delete globalCovariances;
 	}
 }
 
-int
-PotentialManager::init(EvidenceManager* evMgr, bool randomData, vector<int>& varIDs)
+int PotentialManager::init(EvidenceManager* evMgr, bool randomData, vector<int>& varIDs)
 {
-	if (globalCovariances != nullptr)
-	{
+	if (globalCovariances != nullptr) {
 		delete globalCovariances;
 	}
 
@@ -136,14 +123,10 @@ PotentialManager::init(EvidenceManager* evMgr, bool randomData, vector<int>& var
 		}
 	}
 
-	ludecomp = gsl_matrix_alloc(MAXFACTORSIZE_ALLOC, MAXFACTORSIZE_ALLOC);
-	perm = gsl_permutation_alloc(MAXFACTORSIZE_ALLOC);
-
 	return 0;
 }
 
-Potential*
-PotentialManager::createPotential(int factorID)
+Potential* PotentialManager::createPotential(int factorID)
 {
 	int varCount = globalMeans.size();
 	double variance = globalCovariances->getValue(factorID, factorID);
@@ -152,52 +135,36 @@ PotentialManager::createPotential(int factorID)
 	return new Potential(factorID, variance, bias, weights);
 }
 
-void
-PotentialManager::computeLLs(int factorID, int sampleSize, vector<int>&candidateParents, unordered_map<int, double>&scores) {
-
-	double variance = globalCovariances->getValue(factorID, factorID);
-
-	for (int i = 0; i < candidateParents.size(); i++) {
-		int candidateID = candidateParents[i];
-
-		// Var(C)
-		double candidateVariance = globalCovariances->getValue(candidateID, candidateID);
-
-		double factorCandidateCov = globalCovariances->getValue(factorID, candidateID);
-
-		double finalVariance = variance - factorCandidateCov * factorCandidateCov / candidateVariance;
-
-		if (finalVariance < 1e-5) {
-			finalVariance = 1e-5;
-		}
-
-		if(isnan(finalVariance) || isinf(finalVariance)) {
-			continue;
-		}
-		
-		scores[candidateID] = -0.5 * ((sampleSize - 1) + sampleSize * log(2 * PI) + sampleSize * log(finalVariance));
-	}
-}
-
-void
-PotentialManager::computeLLs(int factorID, int sampleSize, vector<int>& existingParents, vector<int>&candidateParents, unordered_map<int, double>&scores) {
+void PotentialManager::computeLLs(int factorID, int sampleSize, vector<int>& existingParents, vector<int>&candidateParents, unordered_map<int, double>&scores) {
 
 	if (existingParents.size() == 0) {
-		computeLLs(factorID, sampleSize, candidateParents, scores);
+		computeSingleParentLLs(factorID, sampleSize, candidateParents, scores);
 		return;
 	}
 
-	double variance = globalCovariances->getValue(factorID, factorID);
+	// In order to compute likelihood, we need the variance of the factor conditioned upon existing parents and the candidate parent.
+	// We use the following framing
+	// A : Factor
+	// B : existing parents
+	// C : candidate parent
+	// Var(A | B, C) = Var(A | B) - Cov(AC | B) * Var(C | B)^-1 * Cov(CA | B)
+	// Var (A | B) = Var(A) - Cov(AB) * Var(B)^-1 * Cov(BA)
+	// Var (C | B) = Var(C) - Cov(CB) * Var(B)^-1 * Cov(BC)
+	// Cov (AC | B) = Cov(AC) - Cov(AB) * Var(B)^-1 * Cov(BC)
+
+	// This allows us to precompute Var(A | B), Var(B)^-1, and Cov(AB) * Var(B)^-1, because they don't rely on C. Since we only add a single
+	// candidate parent at a time, the per candidate work doesn't require any matrix inverts, only scalar and vector multiplication.
 
 	int parentCount = existingParents.size();
 
-	// A : factor
-	// B : existing parents
-	// C : candidate parent
-	// Create Cov(AB) and Cov(BB)
+	// Var(A)
+	double factorVariance = globalCovariances->getValue(factorID, factorID);
 
-	gsl_matrix* existingParentCovariances = gsl_matrix_alloc(parentCount, parentCount);
+	// Cov(AB)
 	gsl_vector* existingParentMarginalVariances = gsl_vector_alloc(parentCount);
+
+	// Cov(BB)
+	gsl_matrix* existingParentCovariances = gsl_matrix_alloc(parentCount, parentCount);
 
 	for (int i = 0; i < parentCount; i++) {
 		int varAID = existingParents[i];
@@ -212,33 +179,28 @@ PotentialManager::computeLLs(int factorID, int sampleSize, vector<int>& existing
 		}
 	}
 
-	// Create Cov(BB)^-1
-
 	gsl_permutation* permutation = gsl_permutation_alloc(parentCount);
 
 	int signum=0;
 	gsl_linalg_LU_decomp(existingParentCovariances, permutation, &signum);
 
+	// Var(B)^-1
 	gsl_matrix* parentCovInverse = gsl_matrix_alloc(parentCount, parentCount);
-
 	gsl_linalg_LU_invert(existingParentCovariances, permutation, parentCovInverse);
 
 	gsl_matrix_free(existingParentCovariances);
 	gsl_permutation_free(permutation);
 
-	// Create Cov(AB) * Cov(BB)^-1
-
+	// Cov(AB) * Var(B)^-1
 	gsl_vector* prod = gsl_vector_alloc(parentCount);
 	gsl_blas_dgemv(CblasTrans, 1, parentCovInverse, existingParentMarginalVariances, 0, prod);
 
-	// Make variance hold Var(A|B) = Var(A) - Cov(AB)Var(BB)^-1 Cov(AB)
+	// Cov(AB) * Var(B)^-1 * Cov(BA)
+	double dot = 0.0;
+	gsl_blas_ddot(prod, existingParentMarginalVariances, &dot);
 
-	for (int i = 0; i < parentCount; i++) {
-		int vID = existingParents[i];
-		double aVal = gsl_vector_get(prod, i);
-		double bVal = gsl_vector_get(existingParentMarginalVariances, i);
-		variance -= aVal * bVal;
-	}
+	// Var(A|B)
+	double existingConditionalVariance = factorVariance - dot;
 
 	gsl_vector_free(existingParentMarginalVariances);
 
@@ -257,34 +219,34 @@ PotentialManager::computeLLs(int factorID, int sampleSize, vector<int>& existing
 			gsl_vector_set(candidateMarginalVariances, i, marginalCovariance);
 		}
 
-		// Create Cov(BC) * Cov(BB)^-1
+		// Cov(BC) * Var(B)^-1
 		gsl_vector* candidateProd = gsl_vector_alloc(parentCount);
 		gsl_blas_dgemv(CblasTrans, 1, parentCovInverse, candidateMarginalVariances, 0, candidateProd);
 
-		// Calc Var(C|B) = Var(BC) - Cov(CB)Var(BB)^-1 Cov(BC)
+		// Cov(BC) * Var(B)^-1 * Cov(CB)
+		double dot = 0.0;
+		gsl_blas_ddot(candidateProd, candidateMarginalVariances, &dot);
 
-		for (int i = 0; i < parentCount; i++) {
-			int vID = existingParents[i];
-			double aVal = gsl_vector_get(candidateProd, i);
-			double bVal = gsl_vector_get(candidateMarginalVariances, i);
-			candidateVariance -= aVal * bVal;
-		}
+		// Var(C|B)
+		double candidateConditionalVariance = candidateVariance - dot;
 
 		// Cov(AC)
 		double candidateFactorCovariance = globalCovariances->getValue(candidateID, factorID);
 
-		// Cov(AB) * Var(BB)^-1 * Cov(BC)
-		double dot = 0.0;
+		// Cov(AB) * Var(B)^-1 * Cov(BC)
+		dot = 0.0;
 		gsl_blas_ddot(prod, candidateMarginalVariances, &dot);
 
 		gsl_vector_free(candidateProd);
 		gsl_vector_free(candidateMarginalVariances);
 
-		double factorAndCandidateVarianceConditionedOnParents = candidateFactorCovariance - dot;
+		// Cov(AC | B)
+		double factorAndCandidateConditionalCov = candidateFactorCovariance - dot;
 
-		double finalVariance = variance - factorAndCandidateVarianceConditionedOnParents * factorAndCandidateVarianceConditionedOnParents / candidateVariance;
+		// Var(A | B, C)
+		double finalVariance = existingConditionalVariance - factorAndCandidateConditionalCov * factorAndCandidateConditionalCov / candidateConditionalVariance;
 		
-		if(finalVariance < 1e-5) {
+		if (finalVariance < 1e-5) {
 			finalVariance = 1e-5;
 		}
 
@@ -299,14 +261,41 @@ PotentialManager::computeLLs(int factorID, int sampleSize, vector<int>& existing
 	gsl_vector_free(prod);
 }
 
-double
-PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize, Potential** newPot)
+// Computes a gaussian log likelihood of factor id conditioned upon a single parent, for each candidate parent.
+// The single parent case is broken out into a separate function because it can be done with fast scalar arithmetic.
+void PotentialManager::computeSingleParentLLs(int factorID, int sampleSize, vector<int>&candidateParents, unordered_map<int, double>&scores) {
+
+	double factorVariance = globalCovariances->getValue(factorID, factorID);
+
+	for (int i = 0; i < candidateParents.size(); i++) {
+		int candidateID = candidateParents[i];
+
+		double candidateVariance = globalCovariances->getValue(candidateID, candidateID);
+
+		if (candidateVariance < 1e-10) {
+			continue;
+		}
+
+		double factorCandidateCov = globalCovariances->getValue(factorID, candidateID);
+		double finalVariance = factorVariance - factorCandidateCov * factorCandidateCov / candidateVariance;
+
+		if (finalVariance < 1e-5) {
+			finalVariance = 1e-5;
+		}
+
+		if(isnan(finalVariance) || isinf(finalVariance)) {
+			continue;
+		}
+
+		scores[candidateID] = -0.5 * ((sampleSize - 1) + sampleSize * log(2 * PI) + sampleSize * log(finalVariance));
+	}
+}
+
+Potential* PotentialManager::createPotential(int factorID, vector<int>& parentIDs)
 {
+	int parentCount = parentIDs.size();
 	double variance = globalCovariances->getValue(factorID, factorID);
 	double bias = globalMeans[factorID];
-	unordered_map<int, double> weights;
-
-	int parentCount = parentIDs.size();
 
 	// Start by collecting a matrix of all the covariances of the conditioning variables,
 	// and the marginal variances of the conditioning variables.
@@ -339,6 +328,7 @@ PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize
 
 	gsl_linalg_LU_solve(parentCovariances, permutation, parentMarginalVariances, x);
 
+	unordered_map<int, double> weights;
 	for (int i = 0; i < parentCount; i++) {
 		int vID = parentIDs[i];
 		double aVal = gsl_vector_get(x, i);
@@ -354,19 +344,5 @@ PotentialManager::computeLL(int factorID, vector<int>& parentIDs, int sampleSize
 	gsl_permutation_free(permutation);
 	gsl_matrix_free(parentCovariances);
 
-	if(variance < 1e-5) {
-		variance = 1e-5;
-	}
-
-	// If the variance is invalid, then we don't want to attempt adding this edge,
-	// so we should just bail out before computing the LL
-	if(isnan(variance) || isinf(variance)) {
-		return -1;
-	}
-
-	// Now that the conditional Gaussian params are computed, we can create the potential.
-	*newPot = new Potential(factorID, variance, bias, weights);
-
-	// Finally, compute the conditional log likelihood.
-	return -0.5 * ((sampleSize - 1) + sampleSize * log(2 * PI) + sampleSize * log(variance));
+	return new Potential(factorID, variance, bias, weights);
 }

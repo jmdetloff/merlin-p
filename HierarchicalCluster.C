@@ -19,8 +19,7 @@
 HierarchicalClusterNode*
 HierarchicalCluster::getNode(string nodeName)
 {
-	if(nodeSet.find(nodeName)==nodeSet.end())
-	{
+	if(nodeSet.find(nodeName) == nodeSet.end()) {
 		return nullptr;
 	}
 	return nodeSet[nodeName];
@@ -32,77 +31,59 @@ HierarchicalCluster::addNode(HierarchicalClusterNode* node)
 	nodeSet[node->nodeName] = node;
 }
 
-int
+void
 HierarchicalCluster::cluster(map<int,map<string,int>*>& modules, double threshold, Matrix* correlationDistances, Matrix* sharedParentDistances)
 {
-	auto start = std::chrono::high_resolution_clock::now();
-
-	// currNodeSet holds the subset of nodes in the dendrogram that currently have no parent.
-	unordered_map<int,HierarchicalClusterNode*> currNodeSet;
-
-	// Load leaves into currNodeSet
-	for(map<string,HierarchicalClusterNode*>::iterator nIter = nodeSet.begin(); nIter != nodeSet.end(); nIter++) {
-		int nextNodeIndex = currNodeSet.size();
-		currNodeSet[nextNodeIndex] = nIter->second;
-		nIter->second->id = nextNodeIndex;
-	}
-
-	auto end = std::chrono::high_resolution_clock::now();
-	double seconds = std::chrono::duration<double>(end - start).count();
-	std::cout << "  Point A: " << seconds << " seconds\n";
-	start = std::chrono::high_resolution_clock::now();
-
 	//The total number of nodes that can be there in a hierarchical cluster is 2n-1
-	int treenodecnt = (nodeSet.size()*2) - 1;
+	int treeNodeCnt = (nodeSet.size() * 2) - 1;
 
 	// Instantiate default distances
-	distvalues = new double*[treenodecnt];
-	for (int i = 0; i < treenodecnt; i++) {
-		distvalues[i] = new double[treenodecnt];
-		for (int j = 0; j < treenodecnt; j++) {
-			distvalues[i][j] = -1000;
+	distValues = new double*[treeNodeCnt];
+	for (int i = 0; i < treeNodeCnt; i++) {
+		distValues[i] = new double[treeNodeCnt];
+		for (int j = 0; j < treeNodeCnt; j++) {
+			distValues[i][j] = -1000;
 		}
 	}
 
-	end = std::chrono::high_resolution_clock::now();
-	seconds = std::chrono::duration<double>(end - start).count();
-	std::cout << "  Point B: " << seconds << " seconds\n";
-	start = std::chrono::high_resolution_clock::now();
+	// Load the nodes into a vector for fast iteration.
+	vector<HierarchicalClusterNode*> allNodes;
+	for(auto iter = nodeSet.begin(); iter != nodeSet.end(); iter++) {
+		int nextNodeIndex = allNodes.size();
+		allNodes.push_back(iter->second);
+		iter->second->id = nextNodeIndex;
+	}
 
 	// Populate distances between the leaf nodes.
-	vector<Pair> pairs = estimatePairwiseDist(currNodeSet, correlationDistances, sharedParentDistances, threshold);
-
-	end = std::chrono::high_resolution_clock::now();
-	seconds = std::chrono::duration<double>(end - start).count();
-	std::cout << "  Point C: " << seconds << " seconds\n";
-	start = std::chrono::high_resolution_clock::now();
+	vector<Pair> pairs = estimatePairwiseDist(allNodes, correlationDistances, sharedParentDistances, threshold);
 
 	priority_queue<Pair, vector<Pair>, ComparePair> pairQueue(pairs.begin(), pairs.end());
 
+	unordered_map<int, HierarchicalClusterNode*> unmergedNodes;
+	for (int i = 0; i < allNodes.size(); i++) {
+		unmergedNodes[i] = allNodes[i];
+	}
+
 	vector<HierarchicalClusterNode*> internalNodes;
+	int nextNodeID = unmergedNodes.size();
 
 	// Merge pairs until threshold distance is reached.
-	int nextNodeID = currNodeSet.size();
-	while(currNodeSet.size() > 1) {
+	while(unmergedNodes.size() > 1) {
+
 		Pair nextPair;
 		if (!getNextPair(pairQueue, nextPair)) {
 			break;
 		}
 
-		HierarchicalClusterNode *newNode = createMergeNode(nextPair, currNodeSet, nextNodeID);
+		HierarchicalClusterNode *newNode = createMergeNode(nextPair, unmergedNodes, nextNodeID);
 		internalNodes.push_back(newNode);
-		addMergeNode(newNode, currNodeSet, pairs, pairQueue, threshold);
+		addMergeNode(newNode, unmergedNodes, pairs, pairQueue, threshold);
 
 		nextNodeID += 1;
 	}
 
-	end = std::chrono::high_resolution_clock::now();
-	seconds = std::chrono::duration<double>(end - start).count();
-	std::cout << "  Point D: " << seconds << " seconds\n";
-	start = std::chrono::high_resolution_clock::now();
-
-	// Populates modules with the clustering represented by currNodeSet
-	generateModules(currNodeSet, modules);
+	// Populates modules with the clustering represented by unmergedNodes
+	generateModules(unmergedNodes, modules);
 
 	// Reset parent to null on all the cached leaf nodes.
 	for(map<string, HierarchicalClusterNode*>::iterator aIter = nodeSet.begin(); aIter != nodeSet.end(); aIter++) {
@@ -113,77 +94,30 @@ HierarchicalCluster::cluster(map<int,map<string,int>*>& modules, double threshol
 	for (vector<HierarchicalClusterNode*>::iterator it = internalNodes.begin(); it != internalNodes.end(); it++) {
 		delete *it;
 	}
-	for (int i = 0; i < treenodecnt; i++) {
-		delete [] distvalues[i];
+	for (int i = 0; i < treeNodeCnt; i++) {
+		delete [] distValues[i];
 	}
-	delete [] distvalues;
-
-	return 0;
+	delete [] distValues;
 }
 
 vector<HierarchicalCluster::Pair>
-HierarchicalCluster::estimatePairwiseDist(unordered_map<int, HierarchicalClusterNode*>& currNodeSet, Matrix* correlationDistances, Matrix* sharedParentDistances, double threshold)
+HierarchicalCluster::estimatePairwiseDist(vector<HierarchicalClusterNode*>& nodes, Matrix* correlationDistances, Matrix* sharedParentDistances, double threshold)
 {
-	vector<HierarchicalClusterNode*> allNodes(currNodeSet.size());
-
-	for(auto iter = currNodeSet.begin(); iter != currNodeSet.end(); iter++) {
-		allNodes[iter->first] = iter->second;
-	}
-
-	// vector<double> denoms(currNodeSet.size(), 0);
-
-	// for (int i = 0; i < allNodes.size(); i++) {
-	// 	double denom = 0;
-	// 	HierarchicalClusterNode* node = allNodes[i];
-	// 	for(auto iter = node->regWeights.begin(); iter != node->regWeights.end(); iter++) {
-	// 		denom += fabs(iter->second);
-	// 	}
-	// 	denoms[i] = denom;
-	// }
-
 	vector<Pair> pairs;
+	for (int i = 0; i < nodes.size(); i++) {
 
-	for (int i = 0; i < allNodes.size(); i++) {
+		HierarchicalClusterNode* hcNode1 = nodes[i];
 
-		HierarchicalClusterNode* hcNode1 = allNodes[i];
-		// double den1 = denoms[i];
+		for(int j = i + 1; j < nodes.size(); j++) {
 
-		for(int j = i + 1; j < allNodes.size(); j++) {
-
-			HierarchicalClusterNode* hcNode2 = allNodes[j];
-			// double den2 = denoms[j];
+			HierarchicalClusterNode* hcNode2 = nodes[j];
 
 			double ccdist = correlationDistances->getValue(hcNode1->varID, hcNode2->varID);
-
-			// We want to loop whichever list of weights is shortest, to minimize checking for non-existent weights.
-			// unordered_map<int, double>* regWeightsSmall = &hcNode1->regWeights;
-			// unordered_map<int, double>* regWeightsBig = &hcNode2->regWeights;
-			// if (regWeightsBig->size() < regWeightsSmall->size()) {
-			// 	regWeightsSmall = &hcNode2->regWeights;
-			// 	regWeightsBig = &hcNode1->regWeights;
-			// }
-
-			// double sharedSign = 0;
-			// for(auto aIter = regWeightsSmall->begin(); aIter != regWeightsSmall->end(); aIter++) {
-
-			// 	auto bIter = regWeightsBig->find(aIter->first);
-			// 	if(bIter == regWeightsBig->end()) {
-			// 		continue;
-			// 	}
-
-			// 	double weight1 = aIter->second;
-			// 	double weight2 = bIter->second;
-			// 	if(weight1 * weight2 >= 0) {
-			// 		sharedSign += (fabs(weight1) + fabs(weight2)) * 0.5;
-			// 	}
-			// }
-
-			// double rdist = 1 - sharedSign / (den1 + den2 - sharedSign);
 			double rdist = sharedParentDistances->getValue(hcNode1->varID, hcNode2->varID);
 
 			double dist = (ccdist + rdist) / 2;
-			distvalues[i][j] = dist;
-			distvalues[j][i] = dist;
+			distValues[i][j] = dist;
+			distValues[j][i] = dist;
 
 			if (dist >= threshold) {
 				continue;
@@ -196,7 +130,6 @@ HierarchicalCluster::estimatePairwiseDist(unordered_map<int, HierarchicalCluster
 			pairs.push_back(p);
 		}
 	}
-
 	return pairs;
 }
 
@@ -219,48 +152,48 @@ HierarchicalCluster::getNextPair(priority_queue<Pair, vector<Pair>, ComparePair>
 }
 
 HierarchicalClusterNode*
-HierarchicalCluster::createMergeNode(Pair& pair, unordered_map<int,HierarchicalClusterNode*>& currNodeSet, int nextNodeID)
+HierarchicalCluster::createMergeNode(Pair& pair, unordered_map<int,HierarchicalClusterNode*>& unmergedNodes, int nextNodeID)
 {
-	HierarchicalClusterNode* c1=pair.node1;
-	HierarchicalClusterNode* c2=pair.node2;
+	HierarchicalClusterNode* c1 = pair.node1;
+	HierarchicalClusterNode* c2 = pair.node2;
 
 	// Create a new node for the merged pair
-	HierarchicalClusterNode* c12=new HierarchicalClusterNode;
+	HierarchicalClusterNode* c12 = new HierarchicalClusterNode;
 	c12->id = nextNodeID;
-	c12->left=c1;
-	c12->right=c2;
-	c12->size=c1->size+c2->size;
+	c12->left = c1;
+	c12->right = c2;
+	c12->size = c1->size + c2->size;
 
-	c1->parent=c12;
-	c2->parent=c12;
+	c1->parent = c12;
+	c2->parent = c12;
 
-	// Remove child nodes from the currNodeSet
-	currNodeSet.erase(c1->id);
-	currNodeSet.erase(c2->id);
+	// Remove the merged nodes from unmergedNodes
+	unmergedNodes.erase(c1->id);
+	unmergedNodes.erase(c2->id);
 
 	return c12;
 }
 
 void
-HierarchicalCluster::addMergeNode(HierarchicalClusterNode* node, unordered_map<int, HierarchicalClusterNode*>& currNodeSet, vector<Pair>& pairs, priority_queue<Pair, vector<Pair>, ComparePair>& pairQueue, double threshold)
+HierarchicalCluster::addMergeNode(HierarchicalClusterNode* node, unordered_map<int, HierarchicalClusterNode*>& unmergedNodes, vector<Pair>& pairs, priority_queue<Pair, vector<Pair>, ComparePair>& pairQueue, double threshold)
 {
-	HierarchicalClusterNode* c1=node->left;
-	HierarchicalClusterNode* c2=node->right;
+	HierarchicalClusterNode* c1 = node->left;
+	HierarchicalClusterNode* c2 = node->right;
 
-	double* dist_n1=distvalues[c1->id];
-	double* dist_n2=distvalues[c2->id];
-	double* dist_n12=distvalues[node->id];
+	double* dist_n1 = distValues[c1->id];
+	double* dist_n2 = distValues[c2->id];
+	double* dist_n12 = distValues[node->id];
 
 	// For every other node, set the distance to the new node and create a new pair.
-	for(auto nIter = currNodeSet.begin(); nIter != currNodeSet.end(); nIter++) {
+	for(auto nIter = unmergedNodes.begin(); nIter != unmergedNodes.end(); nIter++) {
 
-		double d1=dist_n1[nIter->first];
-		double d2=dist_n2[nIter->first];
-		double dkm_rdist=((c1->size*d1) + (c2->size*d2))/((double)(c1->size + c2->size));
-		double dist=dkm_rdist;
-		dist_n12[nIter->first]=dist;
-		double* dist_other=distvalues[nIter->first];
-		dist_other[node->id]=dist;
+		double d1 = dist_n1[nIter->first];
+		double d2 = dist_n2[nIter->first];
+		double dkm_rdist = ((c1->size * d1) + (c2->size * d2))/((double)(c1->size + c2->size));
+		double dist = dkm_rdist;
+		dist_n12[nIter->first] = dist;
+		double* dist_other = distValues[nIter->first];
+		dist_other[node->id] = dist;
 
 		if (dist >= threshold) {
 			continue;
@@ -274,42 +207,34 @@ HierarchicalCluster::addMergeNode(HierarchicalClusterNode* node, unordered_map<i
 		pairs.push_back(newPair);
 	}
 
-	currNodeSet[node->id] = node;
+	unmergedNodes[node->id] = node;
 }
 
-int
-HierarchicalCluster::generateModules(unordered_map<int, HierarchicalClusterNode*>& currNodeSet, map<int, map<string, int>*>& modules)
+void
+HierarchicalCluster::generateModules(unordered_map<int, HierarchicalClusterNode*>& unmergedNodes, map<int, map<string, int>*>& modules)
 {
-	int moduleCnt=modules.size();
-	for(auto cIter = currNodeSet.begin(); cIter != currNodeSet.end(); cIter++) {
-		HierarchicalClusterNode* node=cIter->second;
-		map<string,int>* moduleMembers=new map<string,int>;
-		modules[moduleCnt]=moduleMembers;
-		populateMembers(moduleMembers,node);
-		// cout <<"Module " << moduleCnt << " size: "<< moduleMembers->size() << endl;
-		moduleCnt=moduleCnt+1;
+	int moduleCnt = modules.size();
+	for(auto cIter = unmergedNodes.begin(); cIter != unmergedNodes.end(); cIter++) {
+		HierarchicalClusterNode* node = cIter->second;
+		map<string,int>* moduleMembers = new map<string,int>;
+		modules[moduleCnt] = moduleMembers;
+		populateMembers(moduleMembers, node);
+		moduleCnt += 1;
 	}
 	cout <<"   Number of non-singleton modules: " << moduleCnt << endl;
-	return 0;
 }
 
-int
-HierarchicalCluster::populateMembers(map<string,int>* members,HierarchicalClusterNode* node)
+void
+HierarchicalCluster::populateMembers(map<string,int>* members, HierarchicalClusterNode* node)
 {
-	if(node->left==NULL && node->right==NULL)
-	{
-		(*members)[node->nodeName]=0;
-	}
-	else
-	{
-		if(node->left!=NULL)
-		{
-			populateMembers(members,node->left);
+	if(node->left == NULL && node->right == NULL) {
+		(*members)[node->nodeName] = 0;
+	} else {
+		if (node->left != NULL) {
+			populateMembers(members, node->left);
 		}
-		if(node->right!=NULL)
-		{
-			populateMembers(members,node->right);
+		if (node->right != NULL) {
+			populateMembers(members, node->right);
 		}
 	}
-	return 0;
 }

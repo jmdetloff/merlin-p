@@ -61,11 +61,10 @@ MetaLearner::setBeta1(double aval)
 int
 MetaLearner::initEdgePriorMeta_All()
 {
-	for(map<string,map<string,map<string,double>*>*>::iterator gIter=priorgraphmap.begin();gIter!=priorgraphmap.end();gIter++)
-	{
-		map<string,map<string,double>*>* priorgraph = gIter->second;
+	for(map<string, map<string, map<string, double>*>*>::iterator gIter = priorGraphMap.begin(); gIter != priorGraphMap.end(); gIter++) {
+		map<string, map<string, double>*>* priorgraph = gIter->second;
 		unordered_map<int, unordered_map<int, double>*>* edgeprior = new unordered_map<int, unordered_map<int, double>*>();
-		edgepriormap[gIter->first] = edgeprior;
+		edgePriorMap[gIter->first] = edgeprior;
 		initEdgePriorMeta(gIter->first,*priorgraph,*edgeprior);
 	}
 	return 0;
@@ -110,10 +109,10 @@ MetaLearner::setPriorGraph_All(const char* aFName)
 			tok=strtok(NULL,"\t");
 			tokCnt++;
 		}
-		betamap[gname] = gbeta;
+		betaMap[gname] = gbeta;
 		map<string,map<string,double>*>* priorGraph = new map<string,map<string,double>*>();
 		setPriorGraph(fname.c_str(),*priorGraph);
-		priorgraphmap[gname] = priorGraph;
+		priorGraphMap[gname] = priorGraph;
 	}
 	inFile.close();
 	return 0;
@@ -405,11 +404,10 @@ MetaLearner::initEdgePriorMeta(const string& priorName, map<string,map<string,do
 	return 0;
 }
 
-int
+void
 MetaLearner::doCrossValidation(int foldCnt)
 {
-	gsl_rng* r=gsl_rng_alloc(gsl_rng_default);
-	rnd=gsl_rng_alloc(gsl_rng_default);
+	gsl_rng* r = gsl_rng_alloc(gsl_rng_default);
 
 	evidenceManager->setFoldCnt(foldCnt);
 	evidenceManager->splitData(0);
@@ -419,18 +417,16 @@ MetaLearner::doCrossValidation(int foldCnt)
 	//The first key is for the fold number
 	//For each fold we have a trained model. For each trained model we have the likelihood on
 	//all the test sets, including the self test.
-	int foldBegin=0;
-	int foldEnd=foldCnt;
-	if(specificFold>-1)
-	{
-		foldBegin=specificFold;
-		foldEnd=specificFold+1;
+	int foldBegin = 0;
+	int foldEnd = foldCnt;
+	if(specificFold > -1) {
+		foldBegin = specificFold;
+		foldEnd = specificFold + 1;
 	}
-	for(int f=foldBegin;f<foldEnd;f++)
-	{
+
+	for(int f = foldBegin; f < foldEnd; f++) {
 		evidenceManager->splitData(f);
-		if(random)
-		{
+		if(random) {
 			evidenceManager->randomizeEvidence(r, varManager);
 		}
 
@@ -446,7 +442,7 @@ MetaLearner::doCrossValidation(int foldCnt)
 		factorGraph = new FactorGraph(varManager);
 
 		char outputDir[1024];
-		sprintf(outputDir,"%s/fold%d",outputDirName,f);
+		sprintf(outputDir,"%s/fold%d", outputDirName, f);
 		char foldOutputDirCmd[1024];
 		sprintf(foldOutputDirCmd,"mkdir -p %s",outputDir);
 		system(foldOutputDirCmd);
@@ -458,21 +454,14 @@ MetaLearner::doCrossValidation(int foldCnt)
 		clearFoldSpecData();
 	}
 	gsl_rng_free(r);
-
-	gsl_rng_free(rnd);
-	return 0;
 }
 
-int
-MetaLearner::start(int f)
+void
+MetaLearner::start(int currFold)
 {
-	currFold=f;
-	sprintf(foldoutDirName,"%s/fold%d",outputDirName,f);
-	int maxNumRegs = maxFactorSizeApprox-1; // max num of regulators a gene can have
-	rnd=gsl_rng_alloc(gsl_rng_default);
-	int rseed=getpid();
-	gsl_rng_set(rnd,rseed);
-	cout << "Random seed: " << rseed << endl;
+	sprintf(foldoutDirName, "%s/fold%d", outputDirName, currFold);
+	int maxNumRegs = maxFactorSizeApprox - 1;
+
 	initEdgePriorMeta_All();
 	initEdgeSet();
 	initPhysicalDegree();
@@ -484,80 +473,59 @@ MetaLearner::start(int f)
 		variableStatus[var->getName()] = 0;
 	}
 
-	double currGlobalScore=getInitPLLScore();
+	double currGlobalScore = getInitPLLScore();
 
-	int iter=0;
-	bool notConverged=true;
-	while(notConverged && iter < 50) {
+	int iter = 0;
+	bool hasConverged = false;
+
+	while(!hasConverged && iter < 50) {
 		cout << "Beginning regulator identification of iter " << iter << endl;
 
-		updatedThisIteration.clear();
-
-		int subiter = 0;
+		int varID = 0;
 		double scorePremodule = currGlobalScore;
-		while(subiter<varSet.size())
-		{
-			int vID=subiter;
-			Variable* v=varSet[vID];
+
+		while(varID < varSet.size()) {
+
+			Variable* v = varSet[varID];
 
 			// If 5 iterations have passed without finding a score improving parent, then skip.
 			int lastiter = variableStatus[v->getName()];
-			if((iter - lastiter) >= 5)
-			{
+			if((iter - lastiter) >= 5) {
 				cout <<"   Skipping gene " << v->getName() << "; no parents added in last 5 iters." << endl;
-				subiter++;
+				varID++;
 				continue;
 			}
 
-			auto start = std::chrono::high_resolution_clock::now();
-
-			MetaMove* nextMove = getNextMove(maxNumRegs, vID);
-			if (nextMove == nullptr)
-			{
+			MetaMove nextMove;
+			if (!getNextMove(maxNumRegs, varID, nextMove)) {
 				cout <<"   No move found " << v->getName() << endl;
-				subiter++;
+				varID++;
 				continue;
 			}
-
-			auto end = std::chrono::high_resolution_clock::now();
-			double seconds = std::chrono::duration<double>(end - start).count();
-			std::cout << "Get move duration: " << seconds << " seconds\n";
-			start = std::chrono::high_resolution_clock::now();
 
 			makeMove(nextMove, iter);
-			delete nextMove;
 
-			end = std::chrono::high_resolution_clock::now();
-			seconds = std::chrono::duration<double>(end - start).count();
-			std::cout << "Make move duration: " << seconds << " seconds\n";
-			start = std::chrono::high_resolution_clock::now();
+			currGlobalScore = getPLLScore();
 
-			currGlobalScore=getPLLScore();
-
-			end = std::chrono::high_resolution_clock::now();
-			seconds = std::chrono::duration<double>(end - start).count();
-			std::cout << "Update score duration: " << seconds << " seconds\n";
-
-			subiter++;
+			varID++;
 		}
 		cout << "   Finished identifying regulators with score " << currGlobalScore << endl;
-		if((currGlobalScore-scorePremodule)<=convThreshold)
-		{
-			notConverged=false;
+
+		hasConverged = (currGlobalScore - scorePremodule) <= convThreshold;
+
+		if(!hasConverged) {
+			cout << "   Network not converged; score improvement of " << (currGlobalScore - scorePremodule) << ". Redefining modules." << endl;
+			redefineModules(currFold);
 		}
-		else
-		{
-			cout << "   Network not converged; score improvement of " << (currGlobalScore-scorePremodule) << ". Redefining modules." << endl;
-			redefineModules();
-		}
+
 		iter++;
-		scorePremodule=currGlobalScore;
-		dumpAllGraphs(maxNumRegs,f,iter);
+		scorePremodule = currGlobalScore;
+		dumpAllGraphs(maxNumRegs, currFold, iter);
+		updatedThisIteration.clear();
 	}
 
-	cout <<"Final Score " << currGlobalScore << endl;
-	finalScores[f]=currGlobalScore;
-	return 0;
+	cout << "Final Score " << currGlobalScore << endl;
+	finalScores[currFold] = currGlobalScore;
 }
 
 double
@@ -790,20 +758,20 @@ MetaLearner::getPredictionError_CrossValid(int foldid)
 	return 0;
 }
 
-MetaMove*
-MetaLearner::getNextMove(int maxNumRegs, int vID)
+bool
+MetaLearner::getNextMove(int maxNumRegs, int vID, MetaMove& outMove)
 {
 	unordered_map<int, Variable*>& varSet = varManager->getVariableSet();
 	Variable* v = varSet[vID];
 
 	if(geneModuleID.find(v->getName()) == geneModuleID.end()) {
-		return nullptr;
+		return false;
 	}
 
 	// If v already has the max number of parents, dont test adding another.
 	SlimFactor* dFactor = factorGraph->getFactorAt(vID);
 	if(dFactor->mergedMB.size() >= maxNumRegs) {
-		return nullptr;
+		return false;
 	}
 
 	// Collect the new set of parents for v
@@ -901,7 +869,7 @@ MetaLearner::getNextMove(int maxNumRegs, int vID)
 
 	// If we could not find a parent to add to v that would improve the score:
 	if(bestRegulator == NULL || bestScoreImprovement <= 0) {
-		return nullptr;
+		return false;
 	}
 
 	Potential* bestPot = NULL;
@@ -910,13 +878,13 @@ MetaLearner::getNextMove(int maxNumRegs, int vID)
 	potManager->computeLL(vID, parentIDs, datasize, &bestPot);
 	parentIDs.pop_back();
 
-	MetaMove* nextMove = new MetaMove;
-	nextMove->setSrcVertex(bestRegulator->getID());
-	nextMove->setTargetVertex(v->getID());
-	nextMove->setTargetMBScore(bestScore);
-	nextMove->setScoreImprovement(bestScoreImprovement);
-	nextMove->setDestPot(bestPot);
-	return nextMove;
+	outMove.setSrcVertex(bestRegulator->getID());
+	outMove.setTargetVertex(v->getID());
+	outMove.setTargetMBScore(bestScore);
+	outMove.setScoreImprovement(bestScoreImprovement);
+	outMove.setDestPot(bestPot);
+
+	return true;
 }
 
 double
@@ -952,7 +920,7 @@ double
 MetaLearner::getEdgePrior(int tfID, int targetID)
 {
 	double fwt = 0;
-	for (map<string, unordered_map<int, unordered_map<int, double>*>*>::iterator pItr = edgepriormap.begin(); pItr != edgepriormap.end(); pItr++) {
+	for (map<string, unordered_map<int, unordered_map<int, double>*>*>::iterator pItr = edgePriorMap.begin(); pItr != edgePriorMap.end(); pItr++) {
 
 		unordered_map<int, unordered_map<int, double>*>* edgeprior = pItr->second;
 		unordered_map<int, unordered_map<int, double>*>::iterator targetIter = edgeprior->find(targetID);
@@ -967,7 +935,7 @@ MetaLearner::getEdgePrior(int tfID, int targetID)
 		}
 
 		double eWeight = regIter->second;
-		double gBeta = betamap[pItr->first];
+		double gBeta = betaMap[pItr->first];
 		fwt += gBeta * eWeight;
 	}
 	double prior = beta1 + fwt;
@@ -975,23 +943,23 @@ MetaLearner::getEdgePrior(int tfID, int targetID)
 }
 
 void
-MetaLearner::makeMove(MetaMove* nextMove, int currIteration)
+MetaLearner::makeMove(MetaMove& nextMove, int currIteration)
 {
 	unordered_map<int, Variable*>& varSet = varManager->getVariableSet();
-	Variable* u = varSet[nextMove->getSrcVertex()];
-	Variable* v = varSet[nextMove->getTargetVertex()];
+	Variable* u = varSet[nextMove.getSrcVertex()];
+	Variable* v = varSet[nextMove.getTargetVertex()];
 
-	SlimFactor* dFactor = factorGraph->getFactorAt(nextMove->getTargetVertex());
+	SlimFactor* dFactor = factorGraph->getFactorAt(nextMove.getTargetVertex());
 
 	// Clean up the old potential
 	delete dFactor->potFunc;
 
 	// Add the new parent and update the potential
-	dFactor->mergedMB[nextMove->getSrcVertex()] = 0;
-	dFactor->potFunc = nextMove->getDestPot();
+	dFactor->mergedMB[nextMove.getSrcVertex()] = 0;
+	dFactor->potFunc = nextMove.getDestPot();
 
 	// Update the current score for this factor
-	(*currPLL)[dFactor->fId] = nextMove->getTargetMBScore();
+	(*currPLL)[dFactor->fId] = nextMove.getTargetMBScore();
 
 	int mID = geneModuleID[v->getName()];
 
@@ -1056,7 +1024,7 @@ MetaLearner::initPhysicalDegree()
 		// Collect the prior edges from enriched TFs to genes in this module, from all prior graphs.
 		unordered_map<string, vector<string>> priorEdges;
 
-		for(map<string, map<string, map<string, double>*>*>::iterator gpIter = priorgraphmap.begin(); gpIter != priorgraphmap.end(); gpIter++) {
+		for(map<string, map<string, map<string, double>*>*>::iterator gpIter = priorGraphMap.begin(); gpIter != priorGraphMap.end(); gpIter++) {
 
 			map<string, map<string, double>*>* priorgraph = gpIter->second;
 
@@ -1198,21 +1166,14 @@ MetaLearner::getModuleContribLogistic(string& tgtName, string& tfName)
 //regulatory program. recompute similarity of all nodes to this merged node. repeat with
 //finding the next most similar pair of nodes.
 
-int
-MetaLearner::redefineModules()
+void
+MetaLearner::redefineModules(int currFold)
 {
-	auto start = std::chrono::high_resolution_clock::now();
-
 	INTINTMAP& tSet=evidenceManager->getTrainingSet();
 
 	if (correlationDistances == nullptr) {
 		initDistances();
 	}
-
-	auto end = std::chrono::high_resolution_clock::now();
-    double seconds = std::chrono::duration<double>(end - start).count();
-    std::cout << "Point 1: " << seconds << " seconds\n";
-	start = std::chrono::high_resolution_clock::now();
 
 	map<string,int> genesWithNoNeighbors;
 
@@ -1241,44 +1202,15 @@ MetaLearner::redefineModules()
 				node->nodeName.append(mIter->first);
 				node->varID = mID;
 				hc.addNode(node);
-
-				// Add expression data on the new node
-				for(INTINTMAP_ITER eIter = tSet.begin(); eIter != tSet.end(); eIter++) {
-					EMAP* evidMap = evidenceManager->getEvidenceAt(eIter->first);
-					Evidence* evid = (*evidMap)[mID];
-					double v = evid->getEvidVal();
-					node->expr.push_back(v);
-				}
 			}
-
-			// Add weights for incoming edges onto the node
-			// unordered_map<int, double>& regWts = mFactor->potFunc->getWeights();
-			// for(auto bIter = regWts.begin(); bIter != regWts.end(); bIter++) {
-				// node->regWeights[bIter->first] = bIter->second;
-			// }
 		}
 	}
 
-	end = std::chrono::high_resolution_clock::now();
-    seconds = std::chrono::duration<double>(end - start).count();
-    std::cout << "Point 2: " << seconds << " seconds\n";
-	start = std::chrono::high_resolution_clock::now();
-
 	updateSharedParentDistances();
-
-	end = std::chrono::high_resolution_clock::now();
-    seconds = std::chrono::duration<double>(end - start).count();
-    std::cout << "Point 2.5: " << seconds << " seconds\n";
-	start = std::chrono::high_resolution_clock::now();
 
 	// Perform the new clustering
 	map<int,map<string,int>*> newModules;
 	hc.cluster(newModules, clusterThreshold, correlationDistances, sharedParentDistances);
-
-	end = std::chrono::high_resolution_clock::now();
-    seconds = std::chrono::duration<double>(end - start).count();
-    std::cout << "Point 3: " << seconds << " seconds\n";
-	start = std::chrono::high_resolution_clock::now();
 
 	// Clear out any data representing the old module assignments
 	moduleGeneSet.clear();
@@ -1290,11 +1222,6 @@ MetaLearner::redefineModules()
 		delete mIter->second;
 	}
 	moduleIndegree.clear();
-
-	end = std::chrono::high_resolution_clock::now();
-    seconds = std::chrono::duration<double>(end - start).count();
-    std::cout << "Point 4: " << seconds << " seconds\n";
-	start = std::chrono::high_resolution_clock::now();
 
 	char moduleFName[1024];
 	sprintf(moduleFName,"%s/fold%d/modules.txt",outputDirName,currFold);
@@ -1344,11 +1271,6 @@ MetaLearner::redefineModules()
 	}
 	modFile.close();
 
-	end = std::chrono::high_resolution_clock::now();
-    seconds = std::chrono::duration<double>(end - start).count();
-    std::cout << "Point 5: " << seconds << " seconds\n";
-	start = std::chrono::high_resolution_clock::now();
-
 	// For any genes with no neighbors, create single gene modules
 	cout << "   Number of singleton modules: " << genesWithNoNeighbors.size() << endl;
 	for(map<string,int>::iterator gIter=genesWithNoNeighbors.begin();gIter!=genesWithNoNeighbors.end();gIter++)
@@ -1361,12 +1283,6 @@ MetaLearner::redefineModules()
 	}
 	genesWithNoNeighbors.clear();
 	cout << "   Finished redefining modules; " << moduleGeneSet.size() << " total modules" << endl;
-
-	end = std::chrono::high_resolution_clock::now();
-    seconds = std::chrono::duration<double>(end - start).count();
-    std::cout << "Point 6: " << seconds << " seconds\n";
-
-	return 0;
 }
 
 void

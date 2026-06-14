@@ -19,7 +19,7 @@ class HierarchicalCluster
 
 		void addNode(HierarchicalClusterNode* node);
 
-		int cluster(map<int, map<string, int>*>& modules, double threshold, Matrix* correlationDistances, Matrix* sharedParentDistances);
+		void cluster(map<int, map<string, int>*>& modules, double threshold, Matrix* correlationDistances, Matrix* sharedParentDistances);
 
 	private:
 		struct Pair
@@ -38,15 +38,15 @@ class HierarchicalCluster
 			}
 		};
 
-		vector<Pair> estimatePairwiseDist(unordered_map<int,HierarchicalClusterNode*>& currNodeSet, Matrix* correlation, Matrix* sharedParentDistances, double threshold);
-		void addMergeNode(HierarchicalClusterNode* node, unordered_map<int,HierarchicalClusterNode*>& currNodeSet, vector<Pair>& pairs, priority_queue<Pair, vector<Pair>, ComparePair>& pairQueue, double threshold);
+		vector<Pair> estimatePairwiseDist(vector<HierarchicalClusterNode*>& nodes, Matrix* correlation, Matrix* sharedParentDistances, double threshold);
+		void addMergeNode(HierarchicalClusterNode* node, unordered_map<int,HierarchicalClusterNode*>& unmergedNodes, vector<Pair>& pairs, priority_queue<Pair, vector<Pair>, ComparePair>& pairQueue, double threshold);
 
-		static HierarchicalClusterNode* createMergeNode(Pair& pair, unordered_map<int,HierarchicalClusterNode*>& currNodeSet, int nextNodeID);
+		static HierarchicalClusterNode* createMergeNode(Pair& pair, unordered_map<int,HierarchicalClusterNode*>& unmergedNodes, int nextNodeID);
 		static bool getNextPair(priority_queue<Pair, vector<Pair>, ComparePair>& pairQueue, Pair& nextPair);
-		static int generateModules(unordered_map<int, HierarchicalClusterNode*>& currNodeSet, map<int, map<string, int>*>& modules);
-		static int populateMembers(map<string, int>* members, HierarchicalClusterNode* node);
+		static void generateModules(unordered_map<int, HierarchicalClusterNode*>& unmergedNodes, map<int, map<string, int>*>& modules);
+		static void populateMembers(map<string, int>* members, HierarchicalClusterNode* node);
 
-		double** distvalues;
-		map<string,HierarchicalClusterNode*> nodeSet;
+		double** distValues;
+		map<string, HierarchicalClusterNode*> nodeSet;
 };
 #endif

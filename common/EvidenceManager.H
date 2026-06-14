@@ -34,14 +34,11 @@ class EvidenceManager
 
 		int randomizeEvidence(gsl_rng*, VariableManager*);
 		int setFoldCnt(int);
-		int setPreRandomizeSplit();
 		int splitData(int);
 		INTINTMAP& getTrainingSet();
 		INTINTMAP& getTestSet();
-		int populateRandIntegers(gsl_rng*, vector<int>&,int,int);
 
 	private:
-		int populateRandIntegers(gsl_rng*, int*,int);
 		int populateRandIntegers(gsl_rng* r, int* randInds, INTINTMAP& populateFrom, int size);
 
 		EVIDENCE_SET evidenceSet;
@@ -49,7 +46,5 @@ class EvidenceManager
 		INTINTMAP trainIndex;
 		INTINTMAP testIndex;
 		int foldCnt;
-		bool preRandomizeSplit;
-		int randseed;
 };
 #endif

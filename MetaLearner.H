@@ -29,7 +29,6 @@ class MetaLearner
 		int setBeta_Motif(double bval);
 		int setConvergenceThreshold(double);
 		int setRestrictedList(const char*);
-		int setPreRandomizeSplit();
 		int initEdgePriorMeta(const string& priorName, map<string, map<string, double>*>& graph, unordered_map<int, unordered_map<int, double>*>& edgePrior);
 		void doCrossValidation(int);
 		int setGlobalEvidenceManager(EvidenceManager*);
@@ -77,7 +76,6 @@ class MetaLearner
 		map<string,int> restrictedVarList;
 		unordered_map<int, double>* currPLL;
 		map<int,double> finalScores;
-		bool preRandomizeSplit;
 		char outputDirName[1024];
 		map<string, double> edgePresenceProb;
 		map<int, double> varNeighborhoodPrior;

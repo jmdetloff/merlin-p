@@ -49,7 +49,7 @@ class MetaLearner
 		double getInitPLLScore(int vId);
 		double getPLLScore();
 		double getEdgePrior(int tfID, int targetID);
-		int clearFoldSpecData();
+		void clearFoldSpecData();
 		int initEdgeSet();
 		bool getNextMove(int currK, int vID, MetaMove& outMove);
 		void makeMove(MetaMove& move, int currIteration);
@@ -91,7 +91,11 @@ class MetaLearner
 		char foldoutDirName[1024];
 		int specificFold;
 		HierarchicalCluster hc;
+
+		// Used for defining modules, the distance metric based on expression.
 		Matrix* correlationDistances;
+
+		// Used for defining modules, the distance metric based on shared parents.
 		Matrix* sharedParentDistances;
 
 		// Tracks whether two nodes share at least one parent.

@@ -67,7 +67,7 @@ HierarchicalCluster::cluster(map<int,map<string,int>*>& modules, double threshol
 	while(unmergedNodes.size() > 1) {
 
 		Pair nextPair;
-		if (!getNextPair(pairQueue, nextPair)) {
+		if (!getNextPair(pairQueue, nextPair, threshold)) {
 			break;
 		}
 
@@ -115,9 +115,9 @@ HierarchicalCluster::estimatePairwiseDist(vector<HierarchicalClusterNode*>& node
 			distValues[i][j] = dist;
 			distValues[j][i] = dist;
 
-			if (dist >= threshold) {
-				continue;
-			}
+			// if (dist >= threshold) {
+			// 	continue;
+			// }
 
 			Pair p;
 			p.node1 = hcNode1;
@@ -130,17 +130,26 @@ HierarchicalCluster::estimatePairwiseDist(vector<HierarchicalClusterNode*>& node
 }
 
 bool
-HierarchicalCluster::getNextPair(priority_queue<Pair, vector<Pair>, ComparePair>& pairQueue, Pair& nextPair)
+HierarchicalCluster::getNextPair(priority_queue<Pair, vector<Pair>, ComparePair>& pairQueue, Pair& nextPair, double threshold)
 {
-	//Keep popping until we reach a pair whose both members have not been visited
-	while(!pairQueue.empty()) {
-		Pair pair = pairQueue.top();
-		pairQueue.pop();
+	if (pairQueue.empty()) {
+		return false;
+	}
 
-		if (pair.node1->parent == nullptr && pair.node2->parent == nullptr) {
-			nextPair = pair;
-			return true;
-		}
+	Pair pair = pairQueue.top();
+	if (pair.value >= threshold) {
+		return false;
+	}
+
+	//Keep popping until we reach a pair whose both members have not been visited
+	while(!pairQueue.empty() && (pair.node1->parent != nullptr || pair.node2->parent != nullptr)) {
+		pairQueue.pop();
+		pair = pairQueue.top();
+	}
+
+	if (pair.node1->parent == nullptr && pair.node2->parent == nullptr) {
+		nextPair = pair;
+		return true;
 	}
 
 	// There was no unvisited node, so we are done merging.
@@ -191,9 +200,9 @@ HierarchicalCluster::addMergeNode(HierarchicalClusterNode* node, unordered_map<i
 		double* dist_other = distValues[nIter->first];
 		dist_other[node->id] = dist;
 
-		if (dist >= threshold) {
-			continue;
-		}
+		// if (dist >= threshold) {
+		// 	continue;
+		// }
 
 		Pair newPair;
 		newPair.value = dist;

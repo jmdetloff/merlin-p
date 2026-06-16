@@ -575,7 +575,6 @@ MetaLearner::clearFoldSpecData()
 		delete sharedParentDistances;
 		sharedParentDistances = nullptr;
 	}
-	return 0;
 }
 
 int

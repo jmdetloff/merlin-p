@@ -42,7 +42,7 @@ class HierarchicalCluster
 		void addMergeNode(HierarchicalClusterNode* node, unordered_map<int,HierarchicalClusterNode*>& unmergedNodes, vector<Pair>& pairs, priority_queue<Pair, vector<Pair>, ComparePair>& pairQueue, double threshold);
 
 		static HierarchicalClusterNode* createMergeNode(Pair& pair, unordered_map<int,HierarchicalClusterNode*>& unmergedNodes, int nextNodeID);
-		static bool getNextPair(priority_queue<Pair, vector<Pair>, ComparePair>& pairQueue, Pair& nextPair);
+		static bool getNextPair(priority_queue<Pair, vector<Pair>, ComparePair>& pairQueue, Pair& nextPair, double threshold);
 		static void generateModules(unordered_map<int, HierarchicalClusterNode*>& unmergedNodes, map<int, map<string, int>*>& modules);
 		static void populateMembers(map<string, int>* members, HierarchicalClusterNode* node);
 

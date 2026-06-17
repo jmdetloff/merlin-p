@@ -72,6 +72,8 @@ MetaLearner::initEdgePriorMeta_All()
 int
 MetaLearner::setPriorGraph_All(const char* aFName)
 {
+	return 0;
+
 	ifstream inFile(aFName);
     if (!inFile.is_open())
     {

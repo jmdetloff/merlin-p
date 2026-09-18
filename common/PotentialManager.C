@@ -33,26 +33,12 @@ void PotentialManager::setupForFold(vector<int>& regIDs)
 
 	vector<double>* evidMap = evidenceSet->getEvidenceAt(0);
 	int varCount = evidMap->size();
-	int sampleCount = evidenceSet->getSize();
+	int sampleCount = 1000;
 
 	globalMeans.clear();
 
 	globalCovariances = new Matrix(varCount, varCount);
 	globalCovariances->setAllValues(-1);
-
-	// Stores the deviations from the mean for each variable and sample.
-	vector<double> deviations(varCount * sampleCount, 0);
-
-	// Copy all the samples into the data matrix
-	for (int sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++)
-	{
-		vector<double>* evidMap = evidenceSet->getEvidenceAt(sampleIndex);
-		for (int vID = 0; vID < varCount; vID++)
-		{
-			double val = (*evidMap)[vID];
-			deviations[vID * sampleCount + sampleIndex] = val;
-		}
-	}
 
 	// Done copying. Now we can go over data and get the means
 	for (int i = 0; i < varCount; i++)
@@ -60,18 +46,10 @@ void PotentialManager::setupForFold(vector<int>& regIDs)
 		double sampleSum = 0;
 		for(int j = 0; j < sampleCount; j++)
 		{
-			sampleSum += deviations[i * sampleCount + j];
+			vector<double>* evidMap = evidenceSet->getEvidenceAt(i);
+			sampleSum += (*evidMap)[j];
 		}
 		globalMeans.push_back(sampleSum / sampleCount);
-	}
-
-	// Finally, use the means to pre-center the data
-	for (int i = 0; i < evidenceSet->getSize(); i++)
-	{
-		for (int j = 0; j < varCount; j++)
-		{
-			deviations[j * sampleCount + i] -= globalMeans[j];
-		}
 	}
 
 	int norm = sampleCount - 1;
@@ -82,7 +60,8 @@ void PotentialManager::setupForFold(vector<int>& regIDs)
 		double ssd = 0.001;
 		for (int j = 0; j < sampleCount; j++)
 		{
-			double dev = deviations[i * sampleCount + j];
+			vector<double>* evidMap = evidenceSet->getEvidenceAt(j);
+			double dev = (*evidMap)[i] - globalMeans[i];
 			ssd += dev * dev;
 		}
 		globalCovariances->setValue(ssd / norm, i, i);
@@ -102,8 +81,14 @@ void PotentialManager::setupForFold(vector<int>& regIDs)
 			double ssd = 0;
 			for (int k = 0; k < sampleCount; k++)
 			{
-				double devI = deviations[regID * sampleCount + k];
-				double devJ = deviations[j * sampleCount + k];
+				vector<double>* evidMap = evidenceSet->getEvidenceAt(k);
+
+				double devI = (*evidMap)[regID];
+				devI -= globalMeans[regID];
+
+				double devJ = (*evidMap)[j];
+				devJ -= globalMeans[j];
+
 				ssd += devI * devJ;
 			}
 

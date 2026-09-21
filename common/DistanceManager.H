@@ -23,7 +23,7 @@ class DistanceManager
 
         void clearIterationData();
 
-        void initDistances(EvidenceSet* trainSet, int varCount);
+        void initDistances(EvidenceSet* trainSet);
 
         void updateSharedParentDistances(FactorGraph* graph, int varCount);
 

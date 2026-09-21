@@ -57,12 +57,7 @@ Framework::init(int argc, char** argv)
 					return eCode;
 				}
 
-				eCode = evManager.loadEvidenceFromFile(optarg);
-				if(eCode != Error::SUCCESS)
-				{
-					cerr << Error::getErrorString(eCode) << endl;
-					return eCode;
-				}
+				evManager.setExpressionFile(optarg);
 				metaLearner.setEvidenceSource(&evManager);
 				metaLearner.setVariableSet(varSet);
 

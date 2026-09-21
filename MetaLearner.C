@@ -1200,7 +1200,7 @@ MetaLearner::redefineModules(int currFold)
 {
 	vector<Variable*>& varSet = variableSet->getVariables();
 	EvidenceSet* trainSet = evidenceSource->getEvidenceSet(EvidenceSource::SetType::TrainingSet);
-	distanceManager->initDistances(trainSet, varSet.size());
+	distanceManager->initDistances(trainSet);
 
 	map<string,int> genesWithNoNeighbors;
 

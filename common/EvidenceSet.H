@@ -9,15 +9,18 @@ using namespace std;
 class EvidenceSet
 {
     public:
-        EvidenceSet(vector<vector<double>*>& dataset, vector<int> indices);
+        EvidenceSet(vector<double>& dataset, size_t sampleCount);
 
-        vector<double>* getEvidenceAt(int index);
+        int getSampleCount();
 
-        int getSize();
+        int getVariableCount();
+
+        double getEvidenceAt(int varIndex, int sampleIndex);
 
     private:
-        vector<vector<double>*>* dataset;
-        vector<int> indices;
+        vector<double>* dataset;
+        size_t sampleCount;
+        size_t varCount;
 
 };
 

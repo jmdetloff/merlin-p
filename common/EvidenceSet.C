@@ -18,9 +18,3 @@ EvidenceSet::getVariableCount()
 {
     return varCount;
 }
-
-double
-EvidenceSet::getEvidenceAt(int varIndex, int sampleIndex)
-{
-    return (*dataset)[varIndex * sampleCount + sampleIndex];
-}

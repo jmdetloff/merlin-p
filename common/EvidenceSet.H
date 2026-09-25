@@ -15,7 +15,11 @@ class EvidenceSet
 
         int getVariableCount();
 
-        double getEvidenceAt(int varIndex, int sampleIndex);
+        // Exposed in the header so it can be inlined elsewhere.
+        double getEvidenceAt(int varIndex, int sampleIndex)
+        {
+            return (*dataset)[varIndex * sampleCount + sampleIndex];
+        }
 
     private:
         vector<double>* dataset;

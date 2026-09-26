@@ -198,9 +198,9 @@ DistanceManager::restoreCheckpointSharedParents(unordered_map<int, unordered_map
 }
 
 void 
-DistanceManager::addSharedParents(unordered_map<int, unordered_map<int, int>> edgeMap, int parentID, int childID)
+DistanceManager::addSharedParents(unordered_map<int, unordered_map<int, int>>& edgeMap, int parentID, int childID)
 {
-    // Mark all other children of parentID as sharing a parent with childID.
+	// Mark all other children of parentID as sharing a parent with childID.
 	unordered_map<int, int> otherTargets = edgeMap[parentID];
 	for (auto iter = otherTargets.begin(); iter != otherTargets.end(); iter++) {
 		int siblingID = iter->first;
@@ -208,7 +208,7 @@ DistanceManager::addSharedParents(unordered_map<int, unordered_map<int, int>> ed
 		sharedParents[siblingID][childID] = 1;
 	}
 
-    addUpdatedThisIteration(childID);
+	addUpdatedThisIteration(childID);
 }
 
 void

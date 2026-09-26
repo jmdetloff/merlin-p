@@ -29,7 +29,7 @@ class DistanceManager
 
         virtual void restoreCheckpointSharedParents(unordered_map<int, unordered_map<int, int>> edgeMap);
 
-        virtual void addSharedParents(unordered_map<int, unordered_map<int, int>> edgeMap, int parentID, int childID);
+        virtual void addSharedParents(unordered_map<int, unordered_map<int, int>>& edgeMap, int parentID, int childID);
 
         void addUpdatedThisIteration(int targetID);
 

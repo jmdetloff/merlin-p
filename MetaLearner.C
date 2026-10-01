@@ -143,11 +143,17 @@ MetaLearner::setConvergenceThreshold(double aVal)
 void
 MetaLearner::setRestrictedList(const char* aFName)
 {
-	strcpy(restrictedFName,aFName);
+	strcpy(restrictedFName, aFName);
 	ifstream inFile(restrictedFName);
-	string buffer;
 
-	int count = 0; // counter for number of restricted regulators
+	if (!inFile.good())
+	{
+		std::cerr << "Error: could not open restricted list file: " << restrictedFName << std::endl;
+		exit(1);
+	}
+
+	string buffer;
+	int count = 0;
 
 	while(inFile.good())
 	{

@@ -1,5 +1,7 @@
 #include <fstream>
 #include <iostream>
+#include <cstring>
+#include <math.h>
 #include "ModuleManager.H"
 #include "VariableSet.H"
 #include "Variable.H"

@@ -491,6 +491,7 @@ MetaLearner::writeFoldProgress(int currFold, int iter, bool notConverged, Checkp
 {
 	vector<Variable*>& varSet = variableSet->getVariables();
 	logger->logVariableMarkovBlankets(currFold, maxFactorSize, factorGraph);
+	logger->logModules(currFold, moduleManager, factorGraph);
 	checkpoint.writeCheckpointMetadata(iter, notConverged);
 	checkpoint.writePLLScore(currPLL, varSet);
 	checkpoint.writeLastUpdate(variableStatus);
@@ -1110,10 +1111,6 @@ MetaLearner::redefineModules(int currFold)
 	}
 	moduleIndegree.clear();
 
-	char moduleFName[1024];
-	sprintf(moduleFName,"%s/fold%d/modules.txt",outputDirName,currFold);
-	ofstream modFile(moduleFName);
-
 	// Read in the new module assignments
 	int largestModuleID = 0;
 	for (auto mIter = newModules.begin(); mIter != newModules.end(); mIter++)
@@ -1124,8 +1121,6 @@ MetaLearner::redefineModules(int currFold)
 		unordered_map<string, int>* indegree = new unordered_map<string,int>;
 		for (const string& geneName : geneSet)
 		{
-			modFile << geneName <<"\t" << mIter->first << endl;
-
 			int mID = variableSet->getVarID(geneName);
 			SlimFactor* mFactor = factorGraph->getFactorAt(mID);
 			INTINTMAP& mbvars1 = mFactor->mergedMB;
@@ -1156,7 +1151,6 @@ MetaLearner::redefineModules(int currFold)
 		moduleIndegree[mIter->first]=indegree;
 		largestModuleID=mIter->first;
 	}
-	modFile.close();
 
 	// For any genes with no neighbors, create single-gene modules
 	cout << "   Number of parentless genes: " << genesWithNoNeighbors.size() << endl;
